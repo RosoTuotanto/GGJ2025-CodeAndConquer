@@ -1,11 +1,25 @@
 local composer = require("composer")
 local scene = composer.newScene()
+local camera = display.newGroup()
 
+
+local object = display.newRect( display.contentCenterX, display.contentCenterY, 5500, 5500 )
+
+object.fill.effect = "generator.checkerboard"
+
+object.fill.effect.color1 = { 0.8, 0, 0.2, 1 }
+object.fill.effect.color2 = { 0.2, 0.2, 0.2, 1 }
+object.fill.effect.xStep = 32
+object.fill.effect.yStep = 32
 -- Pelin päämuuttujat
 local centerX = display.contentCenterX
 local centerY = display.contentCenterY
 local screenW = display.contentWidth
 local screenH = display.contentHeight
+
+
+camera:insert(object)
+
 
 -- Common plugins, modules, libraries & classes.
 local screen = require("classes.screen")
@@ -13,7 +27,7 @@ local loadsave, savedata
 
 -- Pelaaja
 local player = {
-    model = display.newCircle(centerX, screenH - 50, 20),
+    model = display.newCircle(camera, centerX, centerY, 20),
     hp = 100,
     exp = 0,
     level = 1,
@@ -21,7 +35,12 @@ local player = {
     bulletDamage = 10
 }
 player.model:setFillColor(0, 0.5, 1)
+player.boostSpeed = player.moveSpeed*5  -- Nopeus boostin aikana
+player.boostDuration = 80 -- Boostin kesto millisekunteina (2 sekuntia)
+player.isBoosting = false -- Tila, onko pelaaja tällä hetkellä boostissa
 
+player.xStart = player.model.x
+player.yStart = player.model.y
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
 
@@ -46,13 +65,35 @@ end
 
 local function spawnEnemy()
     local stats = calculateEnemyStats()
+
+    -- Luo vihollinen kuvatiedostolla
     local enemy = {
-        model = display.newCircle(math.random(20, screenW - 20), -20, 15),
+        model = display.newImageRect(camera,"assets/images/slime.png", 50, 50), -- Lisää kuvatiedosto
         hp = stats.hp,
         damage = stats.damage,
         exp = math.random(5, 10) + (player.level - 1) * 2 -- EXP kasvaa tason mukana
     }
-    enemy.model:setFillColor(1, 0, 0)
+
+    -- Aseta vihollisen sijainti (satunnainen reuna)
+    local spawnPosition = math.random(4)
+    if spawnPosition == 1 then
+        -- Yläreuna
+        enemy.model.x = math.random(20, screenW - 20)
+        enemy.model.y = -20
+    elseif spawnPosition == 2 then
+        -- Alareuna
+        enemy.model.x = math.random(20, screenW - 20)
+        enemy.model.y = screenH + 20
+    elseif spawnPosition == 3 then
+        -- Vasemmalta
+        enemy.model.x = -20
+        enemy.model.y = math.random(20, screenH - 20)
+    elseif spawnPosition == 4 then
+        -- Oikealta
+        enemy.model.x = screenW + 20
+        enemy.model.y = math.random(20, screenH - 20)
+    end
+
     table.insert(enemies, enemy)
 end
 
@@ -69,7 +110,7 @@ end
 -- HP-paketit
 local hpPacks = {}
 local function spawnHpPack(x, y)
-    local hpPack = display.newCircle(x, y, 10)
+    local hpPack = display.newCircle(camera,x, y, 10)
     hpPack:setFillColor(0, 1, 0)
     table.insert(hpPacks, hpPack)
 end
@@ -107,11 +148,11 @@ end
 -- Pelaajan ampuminen
 local function fireBullet(event)
     if event.phase == "began" then
-        local bullet = display.newCircle(player.model.x, player.model.y, 5)
+        local bullet = display.newCircle(camera, player.model.x, player.model.y, 5)
         bullet:setFillColor(1, 1, 0)
 
-        local dx = cursorX - player.model.x
-        local dy = cursorY - player.model.y
+        local dx = (cursorX - player.model.x)-camera.x
+        local dy = (cursorY - player.model.y)-camera.y
         local distance = math.sqrt(dx^2 + dy^2)
 
         bullet.vx = (dx / distance) * 10
@@ -125,6 +166,20 @@ end
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
 
+local function activateSpeedBoost()
+    if player.isBoosting then return end -- Estä boostin päällekkäisyys
+
+    player.isBoosting = true -- Pelaaja on boostissa
+    local originalSpeed = player.moveSpeed -- Tallenna alkuperäinen nopeus
+    player.moveSpeed = player.boostSpeed -- Aseta nopeus boostinopeudeksi
+
+    -- Palauta nopeus normaaliksi boostin jälkeen
+    timer.performWithDelay(player.boostDuration, function()
+        player.moveSpeed = originalSpeed
+        player.isBoosting = false
+    end)
+end
+
 local function onKeyEvent(event)
     local key = event.keyName
     if keysPressed[key] ~= nil then
@@ -134,12 +189,19 @@ local function onKeyEvent(event)
             keysPressed[key] = false
         end
     end
-    return true
+
+        -- Tarkista spacebar boostille
+        if key == "space" and event.phase == "down" and not player.isBoosting then
+            activateSpeedBoost()
+        end
+    
+        return trued
 end
 
 local function updatePlayerMovement()
     if keysPressed.w then
         player.model.y = math.max(player.model.y - player.moveSpeed, 0)
+       
     end
     if keysPressed.s then
         player.model.y = math.min(player.model.y + player.moveSpeed, screenH)
@@ -150,6 +212,9 @@ local function updatePlayerMovement()
     if keysPressed.d then
         player.model.x = math.min(player.model.x + player.moveSpeed, screenW)
     end
+
+    camera.y = (player.yStart - player.model.y)
+    camera.x = (player.xStart - player.model.x)
 end
 
 -- Pelin tauottaminen ja jatkaminen
@@ -178,12 +243,15 @@ local function showLevelUpScreen()
     local options = {
         { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100) end },
         { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1 end },
-        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5 end }
+        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5 end },
+        { text = "+1 Friend", action = function() print("You gained a friend!") end },
+        { text = "+1 Shot", action = function() print("You gained an extra shot!") end },
+        { text = "+1 Spread", action = function() print("Your bullets spread wider!") end },
     }
 
-    -- Satunnaista vaihtoehdot
+    -- Valitse satunnaisesti 3 vaihtoehtoa
     local shuffledOptions = {}
-    while #options > 0 do
+    while #shuffledOptions < 3 and #options > 0 do
         local index = math.random(#options)
         table.insert(shuffledOptions, table.remove(options, index))
     end
@@ -297,7 +365,7 @@ local function showGameOverScreen()
     restartButton:setFillColor(1, 1, 0)
     
     restartButton:addEventListener("tap", function()
-        composer.gotoScene("game")  -- Vaihdetaan peliin uudelleen
+        composer.gotoScene("scenes.game")  -- Vaihdetaan peliin uudelleen
     end)
 end
 
