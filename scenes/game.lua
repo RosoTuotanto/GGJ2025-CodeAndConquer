@@ -112,7 +112,8 @@ local playerImages = {
     "assets/images/player.png", -- Ensimmäinen kuva
     "assets/images/player2.png", -- Toinen kuva
 }
--- Pelaaja
+
+
 local player = {
     model = display.newImageRect(camera, playerImages[1], 120, 120), -- Käytä kuvaa pelaajahahmona
     currentFrame = 1,
@@ -123,9 +124,73 @@ local player = {
     bulletDamage = 10,
 }
 
-player.boostSpeed = player.moveSpeed*5  -- Nopeus boostin aikana
-player.boostDuration = 80 -- Boostin kesto millisekunteina (2 sekuntia)
-player.isBoosting = false -- Tila, onko pelaaja tällä hetkellä boostissa
+local background = display.newImageRect( "/assets/images/uibubble2.png", 1850, 150)
+background.x = 960
+background.y = 100
+
+local moveSpeedText= display.newText({
+    text = "MS:" .. player.moveSpeed,
+    x = 960,
+    y = 100,
+    font =  native.systemFont,
+    fontSize = 56,
+})
+local function updateMoveSpeedText()
+    moveSpeedText.text = "MS:" .. player.moveSpeed
+end
+
+local bulletDamageText= display.newText({
+    text = "DMG:" .. player.bulletDamage,
+    x = 480,
+    y = 100,
+    font =  native.systemFont,
+    fontSize = 56,
+})
+local function updateBulletDamageText()
+    bulletDamageText.text = "DMG:" .. player.bulletDamage
+end
+
+local background = display.newImageRect( "/assets/images/uibubble.png", 150, 150)
+background.x = 960
+background.y = 1000
+
+local levelText = display.newText({
+    text = player.level,
+    x = 960,
+    y = 1000,
+    font =  native.systemFont,
+    fontSize = 56,
+})
+local function updateLevelText()
+    levelText.text = player.level
+end
+
+
+
+local background = display.newImageRect( "/assets/images/uibubble.png", 150, 150)
+background.x = 90
+background.y = 1000
+
+
+local hpText = display.newText({
+    text = player.hp .. "/100",
+    x = 90,
+    y = 1000,
+    font = native.systemFont,
+    fontSize = 32,
+})
+
+
+hpText:toFront() 
+
+
+local function updateHPDisplay()
+    hpText.text = player.hp .. "/100"
+end
+
+player.boostSpeed = player.moveSpeed*5
+player.boostDuration = 80
+player.isBoosting = false
 
 -- Asetetaan pelaajan hahmo aloituskohtaan
 player.model.x = centerX
@@ -296,11 +361,11 @@ local function checkHpPackCollision()
         local dy = player.model.y - hpPack.y
         local distance = math.sqrt(dx^2 + dy^2)
 
-        if distance < 60 + 10 then -- Collision detected with HP pack
-            player.hp = math.min(player.hp + 20, 100)  -- Heal player, max HP 100
+        if distance < 60 + 10 then
+            player.hp = math.min(player.hp + 20, 100)
             print("Pelaajan HP:", player.hp)
 
-            display.remove(hpPack)  -- Remove the HP pack after collecting
+            display.remove(hpPack)
             table.remove(hpPacks, i)
         end
     end
@@ -309,6 +374,10 @@ end
 
 -- Pelaajan ampuminen
 local function fireBullet(event)
+
+    audio.stop(channels.gunshot)
+    audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+
     if event.phase == "began" then
         local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
 
@@ -384,39 +453,59 @@ end
 local isPaused = false
 local function pauseGame()
     isPaused = true
+    gamePausedMusic()
 end
 
 local function resumeGame()
     isPaused = false
+    resumeMusic()
 end
 
 -- Level-up-näkymä
 local function showLevelUpScreen()
-    pauseGame()  -- Pause the game
-    
-    -- Create the background overlay
+    pauseGame()
+
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
 
-    -- Create the title
+
     local title = display.newText("Level Up!", centerX, centerY - 100, native.systemFontBold, 32)
     title:setFillColor(1, 1, 1)
 
-    local friendCount = 0  -- Track the number of friends
+    local friendCount = 0
+        local friendCountText = display.newText({
+        text = "Friends: " .. friendCount,
+        x = 1540,
+        y = 100,
+        font =  native.systemFont,
+        fontSize = 56,
+    })
+        -- Funktio päivittää friendCountin tekstin
+    local function updateFriendCountText()
+        friendCountText.text = "Friends: " .. friendCount
+    end
     local options = {
         { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100) end },
-        { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1 end },
-        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5 end },
-        { text = "+1 Friend", action = function() 
-            if friendCount < 4 then  -- Limit to 4 friends
+        { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1
+        updateMoveSpeedText()
+        end },
+        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5
+        updateBulletDamageText()
+        end },
+        { text = "+1 Friend", action = function()
+            if friendCount < 4 then
                 friendCount = friendCount + 1
                 local friend = display.newImageRect( camera, "assets/images/allyshrimp.png", 30, 30 )
                 friend.x = player.model.x
                 friend.y = player.model.y
-
+                updateFriendCountText()  -- Päivitä tekstin näyttö
             end
         end }
     }
+    
+
+    friendCountText:toFront()
+    
 
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
@@ -471,7 +560,7 @@ local function moveEnemies()
         if distance < 60 + 15 then
             player.hp = player.hp - enemy.damage
             print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
-
+            updateHPDisplay()
             display.remove(enemy.model)
             table.remove(enemies, i)
         end
@@ -508,6 +597,7 @@ local function moveBullets()
                         player.exp = 0
                         player.level = player.level + 1
                         print("Taso nousi! Nykyinen taso:", player.level)
+                        updateLevelText()
                         showLevelUpScreen()
                     end
 
@@ -534,31 +624,28 @@ end
 
 
 local function restartGame()
-    -- Reset any necessary game state variables before transitioning
-    player.hp = 100  -- Reset player health
-    player.level = 1  -- Reset player level
-    player.exp = 0    -- Reset experience
-    -- Clear enemies or other game state (if necessary)
+    player.hp = 100
+    player.level = 1
+    player.exp = 0
+   
     for i = #enemies, 1, -1 do
-        display.remove(enemies[i])  -- Remove all enemies
+        display.remove(enemies[i])
         table.remove(enemies, i)
     end
 
-    -- Remove any timers or listeners
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
 
-    -- Transition to the game scene and reset everything
-    composer.removeScene("scenes.game")  -- Clear previous scene
-    composer.gotoScene("scenes.game", { effect = "fade", time = 500 })  -- Transition to the game scene
+    composer.removeScene("scenes.game")
+    composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
 end
 
 
 -- Näytä Game Over ruutu
 local function showGameOverScreen()
-    pauseGame()  -- Pause the game
-    
+    pauseGame()
+
     -- Create game over screen
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
@@ -568,8 +655,8 @@ local function showGameOverScreen()
 
     local restartButton = display.newText("Restart", centerX, centerY + 50, native.systemFont, 24)
     restartButton:setFillColor(1, 1, 0)
-    
-    restartButton:addEventListener("tap", restartGame)  -- Restart the game on tap
+
+    restartButton:addEventListener("tap", restartGame)
 end
 
 
@@ -596,13 +683,11 @@ end
 function scene:show(event)
     local sceneGroup = self.view
     if event.phase == "did" then
-        -- Reset game variables here
+
         player.hp = 100
         player.level = 1
         player.exp = 0
-        -- Reset enemies, bullets, etc.
 
-        -- Start the game logic
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
         Runtime:addEventListener("touch", fireBullet)
@@ -611,11 +696,10 @@ function scene:show(event)
     end
 end
 
--- scene:hide -tapahtumassa lopetetaan peli ja poistetaan tapahtumakuuntelijat
+
 function scene:hide(event)
     local sceneGroup = self.view
     if event.phase == "will" then
-        -- Poistetaan kuuntelijat
         Runtime:removeEventListener("key", onKeyEvent)
         Runtime:removeEventListener("touch", fireBullet)
         Runtime:removeEventListener("mouse", onMouseEvent)
@@ -623,7 +707,6 @@ function scene:hide(event)
     end
 end
 
--- Lisää tapahtumakuuntelijat
 scene:addEventListener("show", scene)
 scene:addEventListener("hide", scene)
 
