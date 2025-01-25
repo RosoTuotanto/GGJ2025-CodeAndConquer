@@ -1,0 +1,2 @@
+﻿Strength level: 1
+Weapon: bubble_wand

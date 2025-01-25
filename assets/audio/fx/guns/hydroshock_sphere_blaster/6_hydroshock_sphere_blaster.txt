@@ -1,0 +1,2 @@
+﻿Strength level: 6
+Weapon: hydroshock_sphere_blaster

@@ -1,0 +1,2 @@
+﻿Strength level: 2
+Weapon: foam_sprayer

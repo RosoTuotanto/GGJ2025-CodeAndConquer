@@ -1,0 +1,2 @@
+﻿Strength level: 4
+Weapon: aqua_orb_launcher

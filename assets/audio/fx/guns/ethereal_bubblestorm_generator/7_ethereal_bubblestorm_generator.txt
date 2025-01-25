@@ -1,0 +1,2 @@
+﻿Strength level: 7
+Weapon: ethereal_bubblestorm_generator
