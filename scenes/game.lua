@@ -3,44 +3,74 @@ local scene = composer.newScene()
 local camera = display.newGroup()
 
 
-local object = display.newRect( display.contentCenterX, display.contentCenterY, 5500, 5500 )
+-- Luo pelikentän taustakuva
+local object = display.newImageRect("assets/images/waterground.png", 5500, 5500)
+object.x = display.contentCenterX
+object.y = display.contentCenterY
 
-object.fill.effect = "generator.checkerboard"
-
-object.fill.effect.color1 = { 0.8, 0, 0.2, 1 }
-object.fill.effect.color2 = { 0.2, 0.2, 0.2, 1 }
-object.fill.effect.xStep = 32
-object.fill.effect.yStep = 32
 -- Pelin päämuuttujat
 local centerX = display.contentCenterX
 local centerY = display.contentCenterY
 local screenW = display.contentWidth
 local screenH = display.contentHeight
 
-
+-- Lisää pelikenttä kameraan
 camera:insert(object)
+
 
 
 -- Common plugins, modules, libraries & classes.
 local screen = require("classes.screen")
 local loadsave, savedata
 
+-- Lataa kuvasarja
+local playerImages = {
+    "assets/images/player.png", -- Ensimmäinen kuva
+    "assets/images/player2.png", -- Toinen kuva
+}
 -- Pelaaja
 local player = {
-    model = display.newCircle(camera, centerX, centerY, 20),
+    model = display.newImageRect(camera, playerImages[1], 120, 120), -- Käytä kuvaa pelaajahahmona
+    currentFrame = 1,
     hp = 100,
     exp = 0,
     level = 1,
     moveSpeed = 5,
-    bulletDamage = 10
+    bulletDamage = 10,
 }
-player.model:setFillColor(0, 0.5, 1)
+
 player.boostSpeed = player.moveSpeed*5  -- Nopeus boostin aikana
 player.boostDuration = 80 -- Boostin kesto millisekunteina (2 sekuntia)
 player.isBoosting = false -- Tila, onko pelaaja tällä hetkellä boostissa
 
+-- Asetetaan pelaajan hahmo aloituskohtaan
+player.model.x = centerX
+player.model.y = centerY
+
 player.xStart = player.model.x
 player.yStart = player.model.y
+
+-- Asetukset animaatiolle
+local animationInterval = 200
+
+
+-- Funktio kuvan vaihtamiseen
+local function animatePlayer()
+    -- Vaihda seuraavaan ruutuun
+    player.currentFrame = player.currentFrame + 1
+    if player.currentFrame > #playerImages then
+        player.currentFrame = 1 -- Palaa ensimmäiseen kuvaan
+    end
+
+    -- Päivitä pelaajan kuva
+    player.model.fill = { type = "image", filename = playerImages[player.currentFrame] }
+end
+
+-- Ajastettu animaatio (toistuva tapahtuma)
+timer.performWithDelay(animationInterval, animatePlayer, 0) -- Toista loputtomasti
+
+
+
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
 
@@ -134,7 +164,7 @@ local function checkHpPackCollision()
         local dy = player.model.y - hpPack.y
         local distance = math.sqrt(dx^2 + dy^2)
 
-        if distance < 20 + 10 then -- Collision detected with HP pack
+        if distance < 60 + 10 then -- Collision detected with HP pack
             player.hp = math.min(player.hp + 20, 100)  -- Heal player, max HP 100
             print("Pelaajan HP:", player.hp)
 
@@ -148,8 +178,8 @@ end
 -- Pelaajan ampuminen
 local function fireBullet(event)
     if event.phase == "began" then
-        local bullet = display.newCircle(camera, player.model.x, player.model.y, 5)
-        bullet:setFillColor(1, 1, 0)
+        local bullet = display.newCircle(camera, player.model.x, player.model.y, 15)
+        bullet:setFillColor(0, 0, 0)
 
         local dx = (cursorX - player.model.x)-camera.x
         local dy = (cursorY - player.model.y)-camera.y
@@ -195,7 +225,7 @@ local function onKeyEvent(event)
             activateSpeedBoost()
         end
     
-        return trued
+        return true
 end
 
 local function updatePlayerMovement()
@@ -229,56 +259,65 @@ end
 
 -- Level-up-näkymä
 local function showLevelUpScreen()
-    pauseGame()
-
-    -- Luo tausta
+    pauseGame()  -- Pause the game
+    
+    -- Create the background overlay
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
 
-    -- Luo otsikko
+    -- Create the title
     local title = display.newText("Level Up!", centerX, centerY - 100, native.systemFontBold, 32)
     title:setFillColor(1, 1, 1)
 
-    -- Luo kolme vaihtoehtoa
+    local friendCount = 0  -- Track the number of friends
     local options = {
         { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100) end },
         { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1 end },
         { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5 end },
-        { text = "+1 Friend", action = function() print("You gained a friend!") end },
+        { text = "+1 Friend", action = function() 
+            if friendCount < 4 then  -- Limit to 4 friends
+                friendCount = friendCount + 1
+                local friend = display.newCircle(camera, player.model.x + 40 * friendCount, player.model.y, 15)
+                friend:setFillColor(0, 0, 1)  -- Blue color for the friend
+            end
+        end },
         { text = "+1 Shot", action = function() print("You gained an extra shot!") end },
         { text = "+1 Spread", action = function() print("Your bullets spread wider!") end },
     }
 
-    -- Valitse satunnaisesti 3 vaihtoehtoa
+    -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
     while #shuffledOptions < 3 and #options > 0 do
         local index = math.random(#options)
         table.insert(shuffledOptions, table.remove(options, index))
     end
 
-    -- Luo vaihtoehdot-napit
+    -- Create buttons for the options
     local buttons = {}
     for i, option in ipairs(shuffledOptions) do
-        local button = display.newText(option.text, centerX, centerY - 40 + i * 40, native.systemFont, 24)
+        local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 24)
         button:setFillColor(1, 1, 0)
 
+        -- Button tap action
         button:addEventListener("tap", function()
-            option.action() -- Suorita valitun vaihtoehdon toiminto
+            option.action()  -- Execute the selected option's action
+            -- Remove level-up screen after selecting an option
             display.remove(overlay)
             display.remove(title)
             for _, b in ipairs(buttons) do
                 display.remove(b)
             end
-            resumeGame()
+            resumeGame()  -- Resume the game
         end)
-
-        -- Tason nousun jälkeen spawn-tiheyttä parannetaan
-        spawnDelay = math.max(1000, spawnDelay - 500) -- Vähennetään 0,5 sekuntia (minimi 1 sekunti)
-        maxEnemiesPerSpawn = math.min(5, maxEnemiesPerSpawn + 1) -- Lisätään enintään 5 vihollista spawnissa
 
         table.insert(buttons, button)
     end
+
+    -- Adjust spawn settings after level-up
+    spawnDelay = math.max(1000, spawnDelay - 500)  -- Decrease spawn delay, but no less than 1 second
+    maxEnemiesPerSpawn = math.min(5, maxEnemiesPerSpawn + 1)  -- Increase the number of enemies spawned, but no more than 5
 end
+
 
 -- Vihollisten liikuttaminen ja törmäys
 local function moveEnemies()
@@ -296,7 +335,7 @@ local function moveEnemies()
         end
 
         -- Pelaajaan osuminen
-        if distance < 20 + 15 then
+        if distance < 60 + 15 then
             player.hp = player.hp - enemy.damage
             print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
 
@@ -351,10 +390,34 @@ local function moveBullets()
     end
 end
 
+
+local function restartGame()
+    -- Reset any necessary game state variables before transitioning
+    player.hp = 100  -- Reset player health
+    player.level = 1  -- Reset player level
+    player.exp = 0    -- Reset experience
+    -- Clear enemies or other game state (if necessary)
+    for i = #enemies, 1, -1 do
+        display.remove(enemies[i])  -- Remove all enemies
+        table.remove(enemies, i)
+    end
+
+    -- Remove any timers or listeners
+    Runtime:removeEventListener("enterFrame", gameLoop)
+    Runtime:removeEventListener("key", onKeyEvent)
+    Runtime:removeEventListener("touch", fireBullet)
+
+    -- Transition to the game scene and reset everything
+    composer.removeScene("scenes.game")  -- Clear previous scene
+    composer.gotoScene("scenes.game", { effect = "fade", time = 500 })  -- Transition to the game scene
+end
+
+
 -- Näytä Game Over ruutu
 local function showGameOverScreen()
-    pauseGame()
-
+    pauseGame()  -- Pause the game
+    
+    -- Create game over screen
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
 
@@ -364,10 +427,9 @@ local function showGameOverScreen()
     local restartButton = display.newText("Restart", centerX, centerY + 50, native.systemFont, 24)
     restartButton:setFillColor(1, 1, 0)
     
-    restartButton:addEventListener("tap", function()
-        composer.gotoScene("scenes.game")  -- Vaihdetaan peliin uudelleen
-    end)
+    restartButton:addEventListener("tap", restartGame)  -- Restart the game on tap
 end
+
 
 -- Tarkista pelaajan HP
 local function checkPlayerHealth()
@@ -392,7 +454,13 @@ end
 function scene:show(event)
     local sceneGroup = self.view
     if event.phase == "did" then
-        -- Vihollisten spawn-looppi alkaa
+        -- Reset game variables here
+        player.hp = 100
+        player.level = 1
+        player.exp = 0
+        -- Reset enemies, bullets, etc.
+
+        -- Start the game logic
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
         Runtime:addEventListener("touch", fireBullet)
