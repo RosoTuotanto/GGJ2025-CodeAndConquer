@@ -86,6 +86,24 @@ local function onMouseEvent(event)
     cursorY = event.y
 end
 
+local function checkHpPackCollision()
+    for i = #hpPacks, 1, -1 do
+        local hpPack = hpPacks[i]
+        local dx = player.model.x - hpPack.x
+        local dy = player.model.y - hpPack.y
+        local distance = math.sqrt(dx^2 + dy^2)
+
+        if distance < 20 + 10 then -- Collision detected with HP pack
+            player.hp = math.min(player.hp + 20, 100)  -- Heal player, max HP 100
+            print("Pelaajan HP:", player.hp)
+
+            display.remove(hpPack)  -- Remove the HP pack after collecting
+            table.remove(hpPacks, i)
+        end
+    end
+end
+
+
 -- Pelaajan ampuminen
 local function fireBullet(event)
     if event.phase == "began" then
@@ -240,6 +258,12 @@ local function moveBullets()
                     player.exp = player.exp + enemy.exp
                     print("Vihollinen kuoli! EXP:", player.exp)
 
+					     -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
+                            if math.random() < 0.3 then
+                            spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
+                            print("HP-paketti tiputettu!")
+                            end
+
                     if player.exp >= levelUpExpThreshold then
                         player.exp = 0
                         player.level = player.level + 1
@@ -259,12 +283,41 @@ local function moveBullets()
     end
 end
 
+-- Näytä Game Over ruutu
+local function showGameOverScreen()
+    pauseGame()
+
+    local overlay = display.newRect(centerX, centerY, screenW, screenH)
+    overlay:setFillColor(0, 0, 0, 0.8)
+
+    local title = display.newText("Game Over", centerX, centerY - 50, native.systemFontBold, 32)
+    title:setFillColor(1, 0, 0)
+
+    local restartButton = display.newText("Restart", centerX, centerY + 50, native.systemFont, 24)
+    restartButton:setFillColor(1, 1, 0)
+    
+    restartButton:addEventListener("tap", function()
+        composer.gotoScene("game")  -- Vaihdetaan peliin uudelleen
+    end)
+end
+
+-- Tarkista pelaajan HP
+local function checkPlayerHealth()
+    if player.hp <= 0 then
+        showGameOverScreen()
+    end
+end
+
+
+
 -- Pelin päivitys
 local function gameLoop()
     if isPaused then return end
     updatePlayerMovement()
     moveEnemies()
     moveBullets()
+    checkPlayerHealth()  -- Tarkistetaan pelaajan terveys
+    checkHpPackCollision()  -- Tarkistetaan pelaajan osuminen HP-packeihin
 end
 
 -- scene:show -tilassa alustetaan ja käynnistetään spawn- ja peli
