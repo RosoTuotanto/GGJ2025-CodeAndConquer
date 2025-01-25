@@ -104,8 +104,8 @@ require("libs.utils")
 ---------------------------------------------------------------------------
 -- The sfx module overwrites parts of the standard audio library. If you wish
 -- to use Solar2D's standard audio API, then comment out the two lines below.
-require("classes.sfx")
-audio.loadSFX("assets/audio")
+--require("classes.sfx")
+--audio.loadSFX("assets/audio")
 ---------------------------------------------------------------------------
 
 if not launchParams.muteGame then

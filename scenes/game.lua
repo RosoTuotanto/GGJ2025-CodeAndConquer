@@ -98,7 +98,7 @@ local function spawnEnemy()
 
     -- Luo vihollinen kuvatiedostolla
     local enemy = {
-        model = display.newImageRect(camera,"assets/images/slime.png", 50, 50), -- Lisää kuvatiedosto
+        model = display.newImageRect(camera, "assets/images/slime.png", 50, 50), -- Käytä ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
         exp = math.random(5, 10) + (player.level - 1) * 2 -- EXP kasvaa tason mukana
@@ -124,7 +124,27 @@ local function spawnEnemy()
         enemy.model.y = math.random(20, screenH - 20)
     end
 
+    -- Lisää vihollinen listaan
     table.insert(enemies, enemy)
+
+    -- Animaatio: Vaihda kahden kuvan välillä
+    local frame = 1
+    local function animateEnemy()
+        if enemy.model.removeSelf == nil then
+            -- Jos vihollinen on poistettu, lopeta animaatio
+            return
+        end
+        if frame == 1 then
+            enemy.model.fill = { type = "image", filename = "assets/images/slime2.png" }
+            frame = 2
+        else
+            enemy.model.fill = { type = "image", filename = "assets/images/slime.png" }
+            frame = 1
+        end
+    end
+
+    -- Käynnistä animaatio 500 ms välein
+    timer.performWithDelay(500, animateEnemy, 0)
 end
 
 -- Vihollisten spawn-loopin käynnistäminen
@@ -137,12 +157,40 @@ local function spawnEnemies()
     timer.performWithDelay(spawnDelay, spawnEnemies)
 end
 
+-- Aloita vihollisten spawnaaminen
+timer.performWithDelay(spawnDelay, spawnEnemies)
+
+
+
 -- HP-paketit
 local hpPacks = {}
 local function spawnHpPack(x, y)
-    local hpPack = display.newCircle(camera,x, y, 10)
-    hpPack:setFillColor(0, 1, 0)
+    -- Luo HP-paketti käyttäen ensimmäistä kuvaa
+    local hpPack = display.newImageRect(camera, "/assets/images/healthpack.png", 50, 50)
+    hpPack.x = x  -- Aseta x-koordinaatti
+    hpPack.y = y  -- Aseta y-koordinaatti
+
+    -- Lisää HP-paketti listaan
     table.insert(hpPacks, hpPack)
+
+    -- Animaatio: Vaihda kahden kuvan välillä
+    local frame = 1
+    local function animateHpPack()
+        if hpPack.removeSelf == nil then
+            -- Jos HP-paketti on jo poistettu, lopeta animaatio
+            return
+        end
+        if frame == 1 then
+            hpPack.fill = { type = "image", filename = "/assets/images/healthpack2.png" }
+            frame = 2
+        else
+            hpPack.fill = { type = "image", filename = "/assets/images/healthpack.png" }
+            frame = 1
+        end
+    end
+
+    -- Suorita animaatio 500 ms välein toistuvasti
+    timer.performWithDelay(500, animateHpPack, 0)
 end
 
 -- Luodit
@@ -178,9 +226,10 @@ end
 -- Pelaajan ampuminen
 local function fireBullet(event)
     if event.phase == "began" then
-        local bullet = display.newCircle(camera, player.model.x, player.model.y, 15)
-        bullet:setFillColor(0, 0, 0)
+        local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
 
+        bullet.x = player.model.x
+        bullet.y = player.model.y
         local dx = (cursorX - player.model.x)-camera.x
         local dy = (cursorY - player.model.y)-camera.y
         local distance = math.sqrt(dx^2 + dy^2)
@@ -277,12 +326,12 @@ local function showLevelUpScreen()
         { text = "+1 Friend", action = function() 
             if friendCount < 4 then  -- Limit to 4 friends
                 friendCount = friendCount + 1
-                local friend = display.newCircle(camera, player.model.x + 40 * friendCount, player.model.y, 15)
-                friend:setFillColor(0, 0, 1)  -- Blue color for the friend
+                local friend = display.newImageRect( camera, "assets/images/allyshrimp.png", 30, 30 )
+                friend.x = player.model.x
+                friend.y = player.model.y
+
             end
-        end },
-        { text = "+1 Shot", action = function() print("You gained an extra shot!") end },
-        { text = "+1 Spread", action = function() print("Your bullets spread wider!") end },
+        end }
     }
 
     -- Shuffle options and pick 3 random ones
@@ -358,18 +407,18 @@ local function moveBullets()
             local dx = bullet.x - enemy.model.x
             local dy = bullet.y - enemy.model.y
             local distance = math.sqrt(dx^2 + dy^2)
-            if distance < 15 + 5 then
+            if distance < 40 + 5 then
                 enemy.hp = enemy.hp - bullet.damage
                 print("Viholliseen osui! HP:", enemy.hp)
                 if enemy.hp <= 0 then
                     player.exp = player.exp + enemy.exp
                     print("Vihollinen kuoli! EXP:", player.exp)
 
-					     -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
-                            if math.random() < 0.3 then
-                            spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
-                            print("HP-paketti tiputettu!")
-                            end
+                    -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
+                    if math.random() < 0.3 then
+                        spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
+                        print("HP-paketti tiputettu!")
+                    end
 
                     if player.exp >= levelUpExpThreshold then
                         player.exp = 0
@@ -377,6 +426,14 @@ local function moveBullets()
                         print("Taso nousi! Nykyinen taso:", player.level)
                         showLevelUpScreen()
                     end
+
+                    -- Lisää splatter kupla-hajoamispisteeseen
+                    local splatter = display.newImageRect(camera, "assets/images/splatter.png", 80, 80)
+                    splatter.x = enemy.model.x
+                    splatter.y = enemy.model.y
+
+                    -- Voit lisätä animaation tai hävittää kuvan myöhemmin
+                    transition.to(splatter, { alpha = 0, time = 5000, onComplete = function() display.remove(splatter) end })
 
                     display.remove(enemy.model)
                     table.remove(enemies, j)
@@ -389,6 +446,7 @@ local function moveBullets()
         end
     end
 end
+
 
 
 local function restartGame()
