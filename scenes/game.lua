@@ -17,6 +17,91 @@ local screenH = display.contentHeight
 -- Lisää pelikenttä kameraan
 camera:insert(object)
 
+--------------------------------------------------
+-- AUDIO & MUSIC ------
+--------------------------------------------------
+audio.setVolume( 1 )
+local gunshotSound = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" )
+local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 }
+local drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_drums_hard.wav")
+local melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_melody_hard.wav")
+
+
+local musicFiles = {
+    rising_threat = {
+        easy = {
+            drums = audio.loadSound("assets/audio/rising_threat/rising_threat_rummut_easy.mp3"),
+            melody = audio.loadSound("assets/audio/rising_threat/rising_threat_melodia_easy.mp3")
+        },
+        medium = {
+            drums = audio.loadSound("assets/audio/rising_threat/rising_threat_rummut_medium.mp3"),
+            melody = audio.loadSound("assets/audio/rising_threat/rising_threat_melodia_medium.mp3")
+        },
+        hard = {
+            drums = audio.loadSound("assets/audio/rising_threat/rising_threat_rummut_hard.mp3"),
+            melody = audio.loadSound("assets/audio/rising_threat/rising_threat_melodia_hard.mp3")
+        }
+    },
+    boss = {
+        easy = {
+            drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_rummut_easy.mp3"),
+            melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_melodia_easy.mp3")
+        },
+        medium = {
+            drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_rummut_medium.mp3"),
+            melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_melodia_medium.mp3")
+        },
+        hard = {
+            drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_rummut_hard.mp3"),
+            melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_melodia_hard.mp3")
+        }
+    }
+    -- journey_ahead = {
+    --     easy = {
+    --         drums = audio.loadStream("assets/audio/uhmakas_3_rummut_easy.wav"),
+    --         melody = audio.loadStream("assets/audio/uhmakas_3_melodia_easy.wav")
+    --     },
+    --     medium = {
+    --         drums = audio.loadStream("assets/audio/uhmakas_3_rummut_medium.wav"),
+    --         melody = audio.loadStream("assets/audio/uhmakas_3_melodia_medium.wav")
+    --     },
+    --     hard = {
+    --         drums = audio.loadStream("assets/audio/uhmakas_3_rummut_hard.wav"),
+    --         melody = audio.loadStream("assets/audio/uhmakas_3_melodia_hard.wav")
+    --     }
+    -- }
+}
+
+
+local music = musicFiles.rising_threat.hard   
+
+local function playMusic()
+    audio.stop(channels.music_drums)
+    audio.stop(channels.music_melody)
+    audio.setVolume( 0.75, { channel = channels.music_drums } )
+    audio.setVolume( 0.75, {  channel = channels.music_melody} )
+    audio.play( music.drums, { channel = channels.music_drums, loops = -1 } )
+    audio.play( music.melody, { channel = channels.music_melody, loops = -1 } )
+end
+
+
+local function pauseMelody()
+    audio.stop(channels.music_melody)
+end
+
+local function gamePausedMusic()
+    pauseMelody()
+end
+
+local function resumeMusic()
+    playMusic()
+end
+
+playMusic()
+
+--------------------------------------------------
+-- AUDIO & MUSIC ------ END
+--------------------------------------------------
 
 
 -- Common plugins, modules, libraries & classes.
@@ -174,9 +259,12 @@ local function checkHpPackCollision()
     end
 end
 
-
 -- Pelaajan ampuminen
 local function fireBullet(event)
+        -- audio.listAudioHandles()
+        audio.stop(channels.gunshot)
+        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+
     if event.phase == "began" then
         local bullet = display.newCircle(camera, player.model.x, player.model.y, 15)
         bullet:setFillColor(0, 0, 0)
@@ -251,10 +339,12 @@ end
 local isPaused = false
 local function pauseGame()
     isPaused = true
+    gamePausedMusic()
 end
 
 local function resumeGame()
     isPaused = false
+    resumeMusic()
 end
 
 -- Level-up-näkymä

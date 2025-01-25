@@ -1,0 +1,2 @@
+﻿Strength level: 3
+Weapon: bubble_popper
