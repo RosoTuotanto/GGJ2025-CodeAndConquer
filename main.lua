@@ -29,7 +29,7 @@ local launchParams = {
 	-- Whether or not the project encodes and protects the save data or not.
 	protectSavedata = true,
 	-- Set master volume to zero.
-	muteGame = true,
+	muteGame = false,
 
 	-- launchScreen.lua contents and visual options:
 	logoFilename = "assets/images/launchScreen/RosoGamesWhiteWeb.png",
@@ -110,7 +110,9 @@ require("libs.utils")
 
 if not launchParams.muteGame then
 	audio.setVolume( 0 )
-end
+else 
+	audio.setVolume( 1 )
+end 
 
 ---------------------------------------------------------------------------
 
@@ -142,7 +144,7 @@ require("widgets.eventListenerWrapper")
 -- Skip past launch screen and start the performance meter plugin.
 if launchParams.debugMode then
 	local performance = require("widgets.performance")
-	performance.start( false, {
+	performance.start( true, {
 		fontColor = { 1, 0.8 },
 		bgColor = { 0, 0.8 },
 		fontSize = 14,

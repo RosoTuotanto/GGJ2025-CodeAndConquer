@@ -26,7 +26,6 @@ local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , mu
 local drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_drums_hard.wav")
 local melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_melody_hard.wav")
 
-
 local musicFiles = {
     rising_threat = {
         easy = {
@@ -371,13 +370,10 @@ local function checkHpPackCollision()
     end
 end
 
-
 -- Pelaajan ampuminen
 local function fireBullet(event)
-
     audio.stop(channels.gunshot)
     audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
-
     if event.phase == "began" then
         local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
 
