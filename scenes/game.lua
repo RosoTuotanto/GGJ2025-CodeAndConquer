@@ -944,7 +944,7 @@ local function showLevelUpScreen()
     }
 
     friendCountText:toFront()
-
+    crosshair:toFront()
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
     while #shuffledOptions < 3 and #options > 0 do
@@ -1151,6 +1151,7 @@ local function moveFriendBullets()
     end
 end
 
+crosshair:toFront()
 
 local function restartGame()
     player.hp = 100
