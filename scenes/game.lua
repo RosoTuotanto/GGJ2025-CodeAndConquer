@@ -139,6 +139,8 @@ local function updateMoveSpeedText()
     moveSpeedText.text = "MS:" .. player.moveSpeed
 end
 
+moveSpeedText:setFillColor(0, 0, 0)
+
 local bulletDamageText= display.newText({
     text = "DMG:" .. player.bulletDamage,
     x = 480,
@@ -150,7 +152,9 @@ local function updateBulletDamageText()
     bulletDamageText.text = "DMG:" .. player.bulletDamage
 end
 
-local background = display.newImageRect( "/assets/images/uibubble.png", 150, 150)
+bulletDamageText:setFillColor(0, 0, 0)
+
+local background = display.newImageRect( "/assets/images/uibubblelvl.png", 150, 150)
 background.x = 960
 background.y = 1000
 
@@ -165,27 +169,40 @@ local function updateLevelText()
     levelText.text = player.level
 end
 
+levelText:setFillColor(0, 0, 0)
 
 
-local background = display.newImageRect( "/assets/images/uibubble.png", 150, 150)
+local background = display.newImageRect( "/assets/images/uibubblehp2.png", 150, 150)
 background.x = 90
 background.y = 1000
 
 
 local hpText = display.newText({
-    text = player.hp .. "/100",
-    x = 90,
-    y = 1000,
+    text = player.hp,
+    x = 65,
+    y = 990,
     font = native.systemFont,
-    fontSize = 32,
+    fontSize = 27,
+    fontColor = blue
 })
 
+hpText:setFillColor(1, 0, 0)
+
+local hpText2 = display.newText({
+    text = "100",
+    x = 113,
+    y = 1001,
+    font = native.systemFont,
+    fontSize = 27,
+})
+
+hpText2:setFillColor(0, 0, 0)
 
 hpText:toFront() 
 
 
 local function updateHPDisplay()
-    hpText.text = player.hp .. "/100"
+    hpText.text = player.hp
 end
 
 player.boostSpeed = player.moveSpeed*5
@@ -367,6 +384,7 @@ local function checkHpPackCollision()
 
             display.remove(hpPack)
             table.remove(hpPacks, i)
+            updateHPDisplay()
         end
     end
 end
@@ -394,6 +412,8 @@ local function fireBullet(event)
         table.insert(bullets, bullet)
     end
 end
+
+
 
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
@@ -484,8 +504,13 @@ local function showLevelUpScreen()
     local function updateFriendCountText()
         friendCountText.text = "Friends: " .. friendCount
     end
+
+    friendCountText:setFillColor(0, 0, 0)
+
     local options = {
-        { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100) end },
+        { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100)
+        updateHPDisplay()
+        end },
         { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1
         updateMoveSpeedText()
         end },
@@ -495,7 +520,7 @@ local function showLevelUpScreen()
         { text = "+1 Friend", action = function()
             if friendCount < 4 then
                 friendCount = friendCount + 1
-                local friend = display.newImageRect( camera, "assets/images/allyshrimp.png", 30, 30 )
+                local friend = display.newImageRect( "assets/images/allyshrimp.png", 30, 30 )
                 friend.x = player.model.x
                 friend.y = player.model.y
                 updateFriendCountText()  -- Päivitä tekstin näyttö
@@ -505,7 +530,30 @@ local function showLevelUpScreen()
     
 
     friendCountText:toFront()
-    
+
+    friendBullets = {}
+
+    local function friendFireBullet(event)
+
+        audio.stop(channels.gunshot)
+        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+
+        if event.phase == "began" then
+            local friendBullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+
+            friendBullet.x = friend.model.x
+            friendBullet.y = friend.model.y
+            local dx = (cursorX - friend.model.x)-camera.x
+            local dy = (cursorY - friend.model.y)-camera.y
+            local distance = math.sqrt(dx^2 + dy^2)
+
+            friendBullet.vx = (dx / distance) * 10
+            friendBullet.vy = (dy / distance) * 10
+            friendBullet.damage = player.bulletDamage*0.5 -- Käytä pelaajan vahinkoa
+
+            table.insert(friendBullets, friendBullet)
+        end
+    end
 
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
@@ -621,6 +669,58 @@ local function moveBullets()
     end
 end
 
+local function moveFriendBullets()
+    if isPaused then return end
+    for i = #friendBullets, 1, -1 do
+        local friendBullet = friendBullets[i]
+        friendBullet.x = friendBullet.x + friendBullet.vx
+        friendBullet.y = friendBullet.y + friendBullet.vy
+
+        for j = #enemies, 1, -1 do
+            local enemy = enemies[j]
+            local dx = friendBullet.x - enemy.model.x
+            local dy = friendBullet.y - enemy.model.y
+            local distance = math.sqrt(dx^2 + dy^2)
+            if distance < 40 + 5 then
+                enemy.hp = enemy.hp - friendBullet.damage
+                print("Viholliseen osui! HP:", enemy.hp)
+                if enemy.hp <= 0 then
+                    player.exp = player.exp + enemy.exp
+                    print("Vihollinen kuoli! EXP:", player.exp)
+
+                    -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
+                    if math.random() < 0.3 then
+                        spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
+                        print("HP-paketti tiputettu!")
+                    end
+
+                    if player.exp >= levelUpExpThreshold then
+                        player.exp = 0
+                        player.level = player.level + 1
+                        print("Taso nousi! Nykyinen taso:", player.level)
+                        updateLevelText()
+                        showLevelUpScreen()
+                    end
+
+                    -- Lisää splatter kupla-hajoamispisteeseen
+                    local splatter = display.newImageRect(camera, "assets/images/splatter.png", 80, 80)
+                    splatter.x = enemy.model.x
+                    splatter.y = enemy.model.y
+
+                    -- Voit lisätä animaation tai hävittää kuvan myöhemmin
+                    transition.to(splatter, { alpha = 0, time = 5000, onComplete = function() display.remove(splatter) end })
+
+                    display.remove(enemy.model)
+                    table.remove(enemies, j)
+                end
+
+                display.remove(friendBullet)
+                table.remove(friendBullets, i)
+                break
+            end
+        end
+    end
+end
 
 
 local function restartGame()
@@ -636,6 +736,7 @@ local function restartGame()
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
+    Runtime:removeEventListener("touch", friendFireBullet)
 
     composer.removeScene("scenes.game")
     composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
@@ -693,6 +794,7 @@ function scene:show(event)
         Runtime:addEventListener("touch", fireBullet)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
+        Runtime:addEventListener("touch", friendFireBullet)
     end
 end
 
@@ -704,6 +806,7 @@ function scene:hide(event)
         Runtime:removeEventListener("touch", fireBullet)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
+        Runtime:removeEventListener("touch", friendFireBullet)
     end
 end
 

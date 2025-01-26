@@ -74,7 +74,7 @@ function scene:show( event )
 						alpha = 0,
 						transition = launchParams.hideEasing or easing.inOut,
 						onComplete = function()
-							composer.gotoScene( "scenes.game", {
+							composer.gotoScene( "scenes.menu", {
 								effect = "fade",
 								time = 100,
 								params = {
@@ -86,7 +86,7 @@ function scene:show( event )
 				end
 			})
 		else
-			composer.gotoScene( "scenes.game", {
+			composer.gotoScene( "scenes.menu", {
 				params = {
 					usesSavedata = launchParams.usesSavedata,
 				}
