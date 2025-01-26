@@ -40,7 +40,7 @@ local launchParams = {
 	logoAnchorX = 0.5,
 	logoAnchorY = 0.5,
 
-	text = "© 2025 Roso Games",
+	text = "© 2025 Emma Julkunen, Aleksi Päivärinta & Maiska",
 	font = native.systemFontBold,
 	fontSize = 24,
 	textAlign = "center",
@@ -110,9 +110,9 @@ require("libs.utils")
 
 if not launchParams.muteGame then
 	audio.setVolume( 0 )
-else 
+else
 	audio.setVolume( 1 )
-end 
+end
 
 ---------------------------------------------------------------------------
 
