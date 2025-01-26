@@ -586,6 +586,7 @@ local function showLevelUpScreen()
             -- Remove level-up screen after selecting an option
             display.remove(overlay)
             display.remove(title)
+            display.remove(bubble)
             for _, b in ipairs(buttons) do
                 display.remove(b)
             end
