@@ -773,7 +773,7 @@ local function fireBullet(event)
 
         for i=1, #shooter do
 
-            local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+            -- local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
 
             local origin = shooter[i]
 
