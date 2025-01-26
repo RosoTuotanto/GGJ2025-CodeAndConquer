@@ -1113,11 +1113,16 @@ local function moveFriendBullets()
                     end
 
                     if player.exp >= levelUpExpThreshold then
-                        player.exp = 0
+                        -- player.exp = 0
                         player.level = player.level + 1
+                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
                         print("Taso nousi! Nykyinen taso:", player.level)
                         updateLevelText()
                         showLevelUpScreen()
+                        playerLevelUpMusic(player.level)
+                        checkGunUpgrades()
+                        increaselevelUpExpThreshold()
+                        print("Level up threshold increased to:", levelUpExpThreshold)
                     end
 
                     -- Lisää splatter kupla-hajoamispisteeseen
@@ -1166,7 +1171,6 @@ local function restartGame()
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
-    -- Runtime:removeEventListener("touch", onTouch)
     composer.removeScene("scenes.game")
     composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
 end
@@ -1224,7 +1228,7 @@ function scene:show(event)
 
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
-        Runtime:addEventListener("touch", fireBullet)
+        Runtime:addEventListener("touch", onTouch)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
     end
@@ -1235,7 +1239,7 @@ function scene:hide(event)
     local sceneGroup = self.view
     if event.phase == "will" then
         Runtime:removeEventListener("key", onKeyEvent)
-        Runtime:removeEventListener("touch", fireBullet)
+        Runtime:removeEventListener("touch", onTouch)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
     end
