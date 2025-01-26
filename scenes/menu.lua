@@ -25,13 +25,13 @@ function scene:create(event)
     end
 
     -- Luo painikkeet
-    local startButton = display.newImageRect(sceneGroup, "assets/images/playbutton.png", 200, 50)
+    local startButton = display.newImageRect(sceneGroup, "assets/images/playbutton.png", 800, 150)
     startButton.x = display.contentCenterX
-    startButton.y = 600
+    startButton.y = 500
     startButton.id = "start"
     startButton:addEventListener("tap", onButtonPress)
 
-    local exitButton = display.newImageRect(sceneGroup, "assets/images/exitbutton.png", 200, 50)
+    local exitButton = display.newImageRect(sceneGroup, "assets/images/exitbutton.png", 800, 150)
     exitButton.x = display.contentCenterX
     exitButton.y = 800
     exitButton.id = "exit"
