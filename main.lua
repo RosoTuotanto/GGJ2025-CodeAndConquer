@@ -23,7 +23,7 @@ local launchParams = {
 	-------------------------------------
 	-- debugMode sends prints to browser console on HTML5 platform, skips directly
 	-- to game, toggles on loadsave's error reporting and loads performance meter.
-	debugMode = true,
+	debugMode = false,
 	-- Whether or not the project utilises persistent data via Spyric Loadsave.
 	usesSavedata = false,
 	-- Whether or not the project encodes and protects the save data or not.
@@ -104,8 +104,8 @@ require("libs.utils")
 ---------------------------------------------------------------------------
 -- The sfx module overwrites parts of the standard audio library. If you wish
 -- to use Solar2D's standard audio API, then comment out the two lines below.
--- require("classes.sfx")
--- audio.loadSFX("assets/audio")
+--require("classes.sfx")
+--audio.loadSFX("assets/audio")
 ---------------------------------------------------------------------------
 
 if not launchParams.muteGame then
