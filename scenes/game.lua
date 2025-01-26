@@ -756,10 +756,7 @@ end
 
 -- Pelaajan ampuminen
 local function fireBullet(event)
-        -- audio.listAudioHandles()
-        audio.stop(channels.gunshot)
-        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
-
+    
     if event.phase == "began" then
         local shooter = {player.model}
         audio.stop(channels.gunshot)
@@ -791,9 +788,10 @@ local function fireBullet(event)
 
             local damageMultiplier = origin == player.model and 1 or 0.5
             bullet.damage = player.bulletDamage*damageMultiplier-- Käytä pelaajan vahinkoa
-
+            
         table.insert(bullets, bullet)
 
+        end
     end
 end
 
@@ -896,6 +894,17 @@ local function resumeGame()
     timer.resumeAll()
 end
 
+-- Funktio, joka luo uuden ystävän
+local function createFriend()
+    local friend = display.newImageRect(camera, "assets/images/allyshrimp.png", 30, 30)
+    friend.x = player.model.x
+    friend.y = player.model.y
+
+    friendList[#friendList +1] = friend
+    return friend
+end
+
+
 -- Level-up-näkymä
 local function showLevelUpScreen()
     pauseGame()
@@ -909,37 +918,29 @@ local function showLevelUpScreen()
 
     local friendCount = 0  -- Track the number of friends
     local options = {
-        { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100) end },
-        { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1 end },
-        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5 end },
-        { text = "+1 Friend", action = function() 
-            if friendCount < 4 then  -- Limit to 4 friends
-                friendCount = friendCount + 1
-                local friend = display.newCircle(camera, player.model.x + 40 * friendCount, player.model.y, 15)
-                friend:setFillColor(0, 0, 1)  -- Blue color for the friend
-            end
-        end },
-        { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1
-        updateMoveSpeedText()
-        end },
-        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5
-        updateBulletDamageText()
-        end },
-        { 
-            text = "+1 Friend",
-            action = function()
-                    createFriend()  -- Kutsu luontifunktiota
-                    updateFriendCountText()  -- Päivitä tekstin näyttö
+        { text = "+20 HP", action = 
+            function() 
+                player.hp = math.min(player.hp + 20, 100) 
+            end },
+        { text = "+1 Speed", action = 
+            function() 
+                player.moveSpeed = player.moveSpeed + 1
+                updateMoveSpeedText()
+            end },
+        { text = "+5 Bullet Damage", action = 
+            function() 
+                player.bulletDamage = player.bulletDamage + 5
+                updateBulletDamageText()
+            end },
+        { text = "+1 Friend", action = 
+            function()
+                createFriend()  -- Kutsu luontifunktiota
+                updateFriendCountText()  -- Päivitä tekstin näyttö
             end
         }
     }
 
-
     friendCountText:toFront()
-
-
-
-
 
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
@@ -1229,7 +1230,7 @@ function scene:show(event)
 
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
-        Runtime:addEventListener("touch", onTouch)
+        Runtime:addEventListener("touch", fireBullet)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
     end
@@ -1240,7 +1241,7 @@ function scene:hide(event)
     local sceneGroup = self.view
     if event.phase == "will" then
         Runtime:removeEventListener("key", onKeyEvent)
-        Runtime:removeEventListener("touch", onTouch)
+        Runtime:removeEventListener("touch", fireBullet)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
     end
