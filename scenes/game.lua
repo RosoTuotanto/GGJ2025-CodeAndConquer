@@ -1,7 +1,7 @@
 local composer = require("composer")
 local scene = composer.newScene()
 local camera = display.newGroup()
-
+local friendList = {}
 
 -- Luo pelikentän taustakuva
 local object = display.newImageRect("assets/images/waterground.png", 5500, 5500)
@@ -153,6 +153,20 @@ local function updateBulletDamageText()
 end
 
 bulletDamageText:setFillColor(0, 0, 0)
+
+local friendCountText = display.newText({
+    text = "Friends: " .. #friendList,
+    x = 1540,
+    y = 100,
+    font =  native.systemFont,
+    fontSize = 56,
+})
+    -- Funktio päivittää friendCountin tekstin
+local function updateFriendCountText()
+    friendCountText.text = "Friends: " .. #friendList
+end
+
+friendCountText:setFillColor(0, 0, 0)
 
 local background = display.newImageRect( "/assets/images/uibubblelvl.png", 150, 150)
 background.x = 960
@@ -361,7 +375,7 @@ end
 
 -- Luodit
 local bullets = {}
-
+local  friendBullets = {}
 -- Kursorin sijainti
 local cursorX, cursorY = centerX, centerY
 
@@ -397,19 +411,36 @@ local function fireBullet(event)
     audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
 
     if event.phase == "began" then
-        local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+        local shooter = {player.model}
 
-        bullet.x = player.model.x
-        bullet.y = player.model.y
-        local dx = (cursorX - player.model.x)-camera.x
-        local dy = (cursorY - player.model.y)-camera.y
-        local distance = math.sqrt(dx^2 + dy^2)
+        if #friendList > 0 then
+            for i=1, #friendList do
 
-        bullet.vx = (dx / distance) * 10
-        bullet.vy = (dy / distance) * 10
-        bullet.damage = player.bulletDamage -- Käytä pelaajan vahinkoa
+                table.insert(shooter,friendList[i])
+            end
+            
+        end
 
-        table.insert(bullets, bullet)
+        for i=1, #shooter do
+
+            local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+
+            local origin = shooter[i]
+
+            bullet.x = origin.x
+            bullet.y = origin.y
+            local dx = (cursorX - origin.x)-camera.x
+            local dy = (cursorY - origin.y)-camera.y
+            local distance = math.sqrt(dx^2 + dy^2)
+
+            bullet.vx = (dx / distance) * 10
+            bullet.vy = (dy / distance) * 10
+            
+            local damageMultiplier = origin == player.model and 1 or 0.5
+            bullet.damage = player.bulletDamage*damageMultiplier-- Käytä pelaajan vahinkoa
+
+            table.insert(bullets, bullet)
+        end
     end
 end
 
@@ -474,11 +505,13 @@ local isPaused = false
 local function pauseGame()
     isPaused = true
     gamePausedMusic()
+    timer.pauseAll()
 end
 
 local function resumeGame()
     isPaused = false
     resumeMusic()
+    timer.resumeAll()
 end
 
 -- Level-up-näkymä
@@ -492,20 +525,16 @@ local function showLevelUpScreen()
     local title = display.newText("Level Up!", centerX, centerY - 100, native.systemFontBold, 32)
     title:setFillColor(1, 1, 1)
 
-    local friendCount = 0
-        local friendCountText = display.newText({
-        text = "Friends: " .. friendCount,
-        x = 1540,
-        y = 100,
-        font =  native.systemFont,
-        fontSize = 56,
-    })
-        -- Funktio päivittää friendCountin tekstin
-    local function updateFriendCountText()
-        friendCountText.text = "Friends: " .. friendCount
-    end
 
-    friendCountText:setFillColor(0, 0, 0)
+    -- Funktio, joka luo uuden ystävän
+    local function createFriend()
+        local friend = display.newImageRect(camera, "assets/images/allyshrimp.png", 30, 30)
+        friend.x = player.model.x
+        friend.y = player.model.y
+
+        friendList[#friendList +1] = friend
+        return friend
+    end
 
     local options = {
         { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100)
@@ -517,43 +546,21 @@ local function showLevelUpScreen()
         { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5
         updateBulletDamageText()
         end },
-        { text = "+1 Friend", action = function()
-            if friendCount < 4 then
-                friendCount = friendCount + 1
-                local friend = display.newImageRect( "assets/images/allyshrimp.png", 30, 30 )
-                friend.x = player.model.x
-                friend.y = player.model.y
-                updateFriendCountText()  -- Päivitä tekstin näyttö
+        { 
+            text = "+1 Friend",
+            action = function()
+                    createFriend()  -- Kutsu luontifunktiota
+                    updateFriendCountText()  -- Päivitä tekstin näyttö
             end
-        end }
+        }
     }
-    
+
 
     friendCountText:toFront()
 
-    friendBullets = {}
 
-    local function friendFireBullet(event)
 
-        audio.stop(channels.gunshot)
-        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
 
-        if event.phase == "began" then
-            local friendBullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
-
-            friendBullet.x = friend.model.x
-            friendBullet.y = friend.model.y
-            local dx = (cursorX - friend.model.x)-camera.x
-            local dy = (cursorY - friend.model.y)-camera.y
-            local distance = math.sqrt(dx^2 + dy^2)
-
-            friendBullet.vx = (dx / distance) * 10
-            friendBullet.vy = (dy / distance) * 10
-            friendBullet.damage = player.bulletDamage*0.5 -- Käytä pelaajan vahinkoa
-
-            table.insert(friendBullets, friendBullet)
-        end
-    end
 
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
@@ -577,7 +584,8 @@ local function showLevelUpScreen()
             for _, b in ipairs(buttons) do
                 display.remove(b)
             end
-            resumeGame()  -- Resume the game
+            resumeGame()
+            
         end)
 
         table.insert(buttons, button)
@@ -733,11 +741,14 @@ local function restartGame()
         table.remove(enemies, i)
     end
 
+    for i = #friendList, 1, -1 do
+        display.remove(friendList[i])
+        table.remove(friendList, i)
+    end
+
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
-    Runtime:removeEventListener("touch", friendFireBullet)
-
     composer.removeScene("scenes.game")
     composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
 end
@@ -776,6 +787,7 @@ local function gameLoop()
     updatePlayerMovement()
     moveEnemies()
     moveBullets()
+    moveFriendBullets()
     checkPlayerHealth()  -- Tarkistetaan pelaajan terveys
     checkHpPackCollision()  -- Tarkistetaan pelaajan osuminen HP-packeihin
 end
@@ -794,7 +806,6 @@ function scene:show(event)
         Runtime:addEventListener("touch", fireBullet)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
-        Runtime:addEventListener("touch", friendFireBullet)
     end
 end
 
@@ -806,7 +817,6 @@ function scene:hide(event)
         Runtime:removeEventListener("touch", fireBullet)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
-        Runtime:removeEventListener("touch", friendFireBullet)
     end
 end
 
