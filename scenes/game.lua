@@ -17,15 +17,37 @@ local screenH = display.contentHeight
 -- Lisää pelikenttä kameraan
 camera:insert(object)
 
+native.setProperty( "mouseCursor", "crosshair" )
+native.setProperty( "mouseCursorVisible", false)
+local crosshair = display.newImageRect("assets/images/crosshair.png", 64, 64)
+crosshair.isVisible = false
+local function onMouseMove(event)
+    crosshair.x = event.x
+    crosshair.y = event.y
+    crosshair.isVisible = true
+end
+
+Runtime:addEventListener("mouse", onMouseMove)
+
 --------------------------------------------------
 -- AUDIO & MUSIC ------
 --------------------------------------------------
 audio.setVolume( 1 )
-local gunshotSound = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" )
-local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 }
-local drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_drums_hard.wav")
-local melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_melody_hard.wav")
 
+local gunshotSounds = {
+    gunlevel1 = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" ),
+    gunlevel2 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel3 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel4 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel5 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel6 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel7 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" )
+}
+
+local gunshotSound = audio.loadSound( gunshotSounds.gunlevel1 )
+
+
+local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 , pickup = 7}
 
 local musicFiles = {
     rising_threat = {
@@ -72,18 +94,17 @@ local musicFiles = {
     -- }
 }
 
-
-local music = musicFiles.rising_threat.hard   
+local music = musicFiles.rising_threat.easy   
+local intensityLvl = "easy"
 
 local function playMusic()
     audio.stop(channels.music_drums)
     audio.stop(channels.music_melody)
-    audio.setVolume( 0.75, { channel = channels.music_drums } )
-    audio.setVolume( 0.75, {  channel = channels.music_melody} )
+    audio.setVolume( 0.55, { channel = channels.music_drums } )
+    audio.setVolume( 0.55, {  channel = channels.music_melody} )
     audio.play( music.drums, { channel = channels.music_drums, loops = -1 } )
     audio.play( music.melody, { channel = channels.music_melody, loops = -1 } )
 end
-
 
 local function pauseMelody()
     audio.stop(channels.music_melody)
@@ -95,6 +116,55 @@ end
 
 local function resumeMusic()
     playMusic()
+end
+
+local function pauseMusic()
+    audio.stop(channels.music_drums)
+    audio.stop(channels.music_melody)
+end
+
+local FXfiles = {   
+    gameover = audio.loadSound("assets/audio/fx/environment/gameover_jingle.wav"),
+    gameoverSlap = audio.loadSound("assets/audio/fx/environment/gameover_slap.wav"),
+    lvlUp = audio.loadSound("assets/audio/fx/environment/lvl_up.wav"),
+    perkChosen = audio.loadSound("assets/audio/fx/environment/perk_chosen.wav"),
+    waveClear = audio.loadSound("assets/audio/fx/environment/wave_clear_jingle.wav"),
+    enemyDamage = audio.loadSound("assets/audio/fx/environment/enemy_damage.wav"),
+    enemyDie = audio.loadSound("assets/audio/fx/environment/enemy_die.wav"),
+    playerHit = audio.loadSound("assets/audio/fx/environment/player_hit.wav"),
+    healthPickup = audio.loadSound("assets/audio/fx/environment/health_pickup.wav")
+}
+
+local function getIntensityByLevel(level)
+    if level <= 5 then
+        return "easy"
+    elseif level <= 7 then
+        return "medium"
+    else
+        return "hard"
+    end
+end
+
+function updateMusicIntensity()
+    
+    if player.level >= 5 and currentLevel > 5 then
+        music = musicFiles.wrath_unleashed[intensityLvl]
+    else
+        music = musicFiles.rising_threat[intensityLvl]
+    end
+    playMusic()
+    pauseMelody()
+end
+
+local function playerLevelUpMusic(playerlevel)
+    
+    local intensity = getIntensityByLevel(playerlevel)
+    if intensity ~= intensityLvl then
+        intensityLvl = intensity
+        print("intensity CHANGED", intensityLvl)
+        updateMusicIntensity()
+    end
+
 end
 
 playMusic()
@@ -114,14 +184,15 @@ local playerImages = {
 }
 
 
-local player = {
+player = {
     model = display.newImageRect(camera, playerImages[1], 120, 120), -- Käytä kuvaa pelaajahahmona
     currentFrame = 1,
     hp = 100,
     exp = 0,
     level = 1,
-    moveSpeed = 5,
+    moveSpeed = 2,
     bulletDamage = 10,
+    bulletSpeed = 10,
 }
 
 local background = display.newImageRect( "/assets/images/uibubble2.png", 1850, 150)
@@ -222,6 +293,7 @@ end
 player.boostSpeed = player.moveSpeed*5
 player.boostDuration = 80
 player.isBoosting = false
+player.gunlevel = 1
 
 -- Asetetaan pelaajan hahmo aloituskohtaan
 player.model.x = centerX
@@ -254,11 +326,288 @@ timer.performWithDelay(animationInterval, animatePlayer, 0) -- Toista loputtomas
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
 
+local function increaselevelUpExpThreshold() 
+    levelUpExpThreshold = (levelUpExpThreshold * player.level / 2) * 1.1
+end
+
+local function checkGunUpgrades()
+    
+    if  player.bulletDamage >= 70 then    
+        gunshotSound = gunshotSounds.gunlevel7
+        player.bulletSpeed = 70/1
+        player.gunlevel = 6
+
+    elseif player.bulletDamage >= 60 then
+        gunshotSound = gunshotSounds.gunlevel6
+        player.bulletSpeed = 70/2
+        player.gunlevel = 5
+
+    elseif player.bulletDamage >= 50 then
+        gunshotSound = gunshotSounds.gunlevel5
+        player.bulletSpeed = 70/3
+        player.gunlevel = 4
+
+    elseif player.bulletDamage >= 40 then
+        gunshotSound = gunshotSounds.gunlevel4
+        player.bulletSpeed = 70/4
+        player.gunlevel = 3
+
+    elseif player.bulletDamage >= 20 then
+        gunshotSound = gunshotSounds.gunlevel3
+        player.bulletSpeed = 70/5
+        player.gunlevel = 2
+
+    elseif player.bulletDamage >= 15 then
+        gunshotSound = gunshotSounds.gunlevel2
+        player.bulletSpeed = 70/6
+        player.gunlevel = 1
+
+    else
+        gunshotSound = gunshotSounds.gunlevel1
+
+    end
+
+end
+
 -- Viholliset
 local enemies = {}
 local initialSpawnDelay = 5000 -- millisekuntia (5 sekuntia)
 local spawnDelay = initialSpawnDelay
 local maxEnemiesPerSpawn = 1 -- Määrä vihollisia per spawn (kasvaa tason mukaan)
+currentLevel = 1 -- käytännössä määrää pelin kulun!
+local enemiesPerLevel = 1  * currentLevel * maxEnemiesPerSpawn -- Määrä vihollisia per taso (kasvaa tason mukaan)
+local totalEnemiesSpawned = 0
+local enemiesDown = 0
+
+local bosslLevels = { 
+    [5] = {
+        bossName = "Piranha",
+        bossResource = nil,
+        bossPicture1 = "assets/images/piranha.png",
+        bossPicture2 = "assets/images/piranha2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 200,
+        damage = 10,
+        exp = 200,
+        speedMultiplier = 1.5,
+    },
+    [8] = {
+        bossName = "Seahorse",
+        bossResource = nil,
+        bossPicture1 = "assets/images/seahorse.png",
+        bossPicture2 = "assets/images/seahorse2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 2000,
+        damage = 20,
+        exp = 700,
+        speedMultiplier = 2
+    },
+    [12] = {
+        bossName = "Swordfish",
+        bossResource = nil,
+        bossPicture1 = "assets/images/swordfish.png",
+        bossPicture2 = "assets/images/swordfish2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 3500,
+        damage = 50,
+        exp = 2000,
+        speedMultiplier = 2
+    },
+    [15] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 15000,
+        damage = 70,
+        exp = 10500,
+        speedMultiplier = 2
+    },
+    [17] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 300,
+        damage = 50,
+        exp = 100000,
+        speedMultiplier = 2
+    },
+    [30] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 350,
+        damage = 50,
+        exp = 100000000,
+        speedMultiplier = 2
+    },
+    [35] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 400,
+        damage = 50,
+        exp = 1000000000,
+        speedMultiplier = 2
+    },
+    [40] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 450,
+        damage = 50,
+        exp = 100000000000,
+        speedMultiplier = 2
+    }
+
+}
+
+local function enemyDown()
+    enemiesDown = enemiesDown + 1
+
+    if enemiesDown >= enemiesPerLevel then
+        -- ei voida edistää peliä jos bossi on olemassa
+        if bosslLevels[currentLevel] ~= nil and
+         bosslLevels[currentLevel].isSpawned == true and
+         bosslLevels[currentLevel].isDead == false
+          then
+            return
+        end
+
+        currentLevel = currentLevel + 1
+        enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
+        print("Taso", currentLevel, "aloittaa")
+        print("vihuja nitistettävä", enemiesPerLevel, "!")
+        print("enemiesDown", enemiesDown)
+        if bosslLevels[currentLevel] ~= nil then
+          if bosslLevels[currentLevel].isSpawned == false then
+            spawnBoss()
+          end
+        end
+    end
+
+end
+
+function spawnBoss()
+    print("Spawnataan boss")
+    local boss = {}
+    boss.model = display.newImageRect(camera, bosslLevels[currentLevel].bossPicture1, 100 * (currentLevel * 0.3), 100 * (currentLevel * 0.3))
+
+    local tempImage = display.newImage(bosslLevels[currentLevel].bossPicture1)
+    local imageWidth = tempImage.contentWidth
+    local imageHeight = tempImage.contentHeight
+    tempImage:removeSelf()
+
+    local desiredHeight = 100 * (currentLevel * 0.5)
+    local scaleFactor = desiredHeight / imageHeight
+    boss.model.height = desiredHeight
+    boss.model.width = imageWidth * scaleFactor
+
+    boss.x = display.contentCenterX
+    boss.y = display.contentCenterY
+    boss.hp = bosslLevels[currentLevel].hp
+    boss.damage = bosslLevels[currentLevel].damage
+    boss.exp = bosslLevels[currentLevel].exp
+    boss.isDead = false
+    boss.isBoss = true
+
+    print("bossPicture1: " .. bosslLevels[currentLevel].bossPicture1)
+    bosslLevels[currentLevel].isSpawned = true
+
+    bosslLevels[currentLevel].bossResource = boss
+
+    table.insert(enemies, boss)
+
+    local frame = 1
+    local function animateBoss()
+        -- print("animateBoss(): animoidaan bossi")
+        local boss = bosslLevels[currentLevel].bossResource
+        
+        if boss.isDead or not boss.model then
+            removeBoss(boss)
+            if bosslLevels[currentLevel].bossResource.timer then timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+                bosslLevels[currentLevel].bossResource.timer = nil
+            end
+            if boss.timer then timer.cancel(boss.timer)
+            end
+            
+            return
+        end
+        if boss.model.removeSelf == nil then
+            removeBoss(boss)
+            if bosslLevels[currentLevel].bossResource.timer then timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+                bosslLevels[currentLevel].bossResource.timer = nil
+            end
+            if boss.timer then timer.cancel(boss.timer)
+            end
+            return
+        end
+        -- print("animateBoss(): animoidaan bossia EDELLEEN")
+        if frame == 1 then
+            boss.model.fill = { type = "image", filename = bosslLevels[currentLevel].bossPicture1 }
+            frame = 2
+        else
+            boss.model.fill = { type = "image", filename = bosslLevels[currentLevel].bossPicture2 } 
+            frame = 1
+        end
+        local dx = player.model.x - boss.model.x
+        local dy = player.model.y - boss.model.y
+        local angle = math.deg(math.atan2(dy, dx)) -- Kulma radiaaneista asteiksi
+
+        boss.model.rotation = angle
+
+        if dx < 0 then
+            boss.model.yScale = -1
+        else
+            boss.model.yScale = 1
+        end
+    end
+
+    -- Käynnistä animaatio 300 ms välein
+    bosslLevels[currentLevel].bossResource.timer = timer.performWithDelay(300, animateBoss, 0)
+end
+
+function removeBoss(boss)
+    print("removeBoss(): poistetaan boss")
+    if boss ~= nil then
+            
+        if boss.timer then
+            timer.cancel(boss.timer)
+            boss.timer = nil
+        end
+        if boss.model.removeSelf then
+            boss.model:removeSelf()
+            boss.model = nil
+        end
+        boss.isDead = true
+    end
+
+    if bosslLevels[currentLevel] then
+        bosslLevels[currentLevel].isDead = true
+    end
+
+    if bosslLevels[currentLevel].bossResource.timer then
+        timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+    end
+
+end
 
 -- Pelaajan tason vaikutus vihollisiin
 local function calculateEnemyStats()
@@ -281,7 +630,8 @@ local function spawnEnemy()
         model = display.newImageRect(camera, "assets/images/slime.png", 50, 50), -- Käytä ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
-        exp = math.random(5, 10) + (player.level - 1) * 2 -- EXP kasvaa tason mukana
+        exp = math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
+        isBoss = false
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
@@ -395,7 +745,8 @@ local function checkHpPackCollision()
         if distance < 60 + 10 then
             player.hp = math.min(player.hp + 20, 100)
             print("Pelaajan HP:", player.hp)
-
+            audio.stop( channels.pickup )
+            audio.play( FXfiles.healthPickup, { channel = channels.pickup, loops = 0, fadein = 0, fadeout = 0 } )
             display.remove(hpPack)
             table.remove(hpPacks, i)
             updateHPDisplay()
@@ -403,22 +754,21 @@ local function checkHpPackCollision()
     end
 end
 
-
 -- Pelaajan ampuminen
 local function fireBullet(event)
-
-    audio.stop(channels.gunshot)
-    audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
-
+    
     if event.phase == "began" then
         local shooter = {player.model}
+        audio.stop(channels.gunshot)
+        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+        
+
+        local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
 
         if #friendList > 0 then
             for i=1, #friendList do
-
                 table.insert(shooter,friendList[i])
             end
-            
         end
 
         for i=1, #shooter do
@@ -433,18 +783,48 @@ local function fireBullet(event)
             local dy = (cursorY - origin.y)-camera.y
             local distance = math.sqrt(dx^2 + dy^2)
 
-            bullet.vx = (dx / distance) * 10
-            bullet.vy = (dy / distance) * 10
-            
+            bullet.vx = (dx / distance) * player.bulletSpeed
+            bullet.vy = (dy / distance) * player.bulletSpeed
+
             local damageMultiplier = origin == player.model and 1 or 0.5
             bullet.damage = player.bulletDamage*damageMultiplier-- Käytä pelaajan vahinkoa
+            
+        table.insert(bullets, bullet)
 
-            table.insert(bullets, bullet)
         end
     end
 end
 
+-- AUTOFIRE MEKANIIKKA
 
+-- local isShooting = false
+-- local autoFireTimer = nil
+
+-- local function startAutoFire()
+--     fireBullet()
+--     if not isShooting then
+--         isShooting = true
+--         autoFireTimer = timer.performWithDelay(300 / player.gunlevel * 2, fireBullet, 0) -- Ammu 200 ms välein
+--     end
+-- end
+
+-- local function stopAutoFire()
+--     if isShooting then
+--         isShooting = false
+--         if autoFireTimer then
+--             timer.cancel(autoFireTimer)
+--             autoFireTimer = nil
+--         end
+--     end
+-- end
+
+-- local function onTouch(event)
+--     if event.phase == "began" then
+--         startAutoFire()
+--     elseif event.phase == "ended" or event.phase == "cancelled" then
+--         stopAutoFire()
+--     end
+-- end
 
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
@@ -514,6 +894,17 @@ local function resumeGame()
     timer.resumeAll()
 end
 
+-- Funktio, joka luo uuden ystävän
+local function createFriend()
+    local friend = display.newImageRect(camera, "assets/images/allyshrimp.png", 30, 30)
+    friend.x = player.model.x
+    friend.y = player.model.y
+
+    friendList[#friendList +1] = friend
+    return friend
+end
+
+
 -- Level-up-näkymä
 local function showLevelUpScreen()
     pauseGame()
@@ -530,42 +921,31 @@ local function showLevelUpScreen()
     local title = display.newText("Level Up!", centerX, centerY - 100, native.systemFontBold, 32)
     title:setFillColor(0, 0, 0)
 
-
-    -- Funktio, joka luo uuden ystävän
-    local function createFriend()
-        local friend = display.newImageRect(camera, "assets/images/allyshrimp.png", 30, 30)
-        friend.x = player.model.x
-        friend.y = player.model.y
-
-        friendList[#friendList +1] = friend
-        return friend
-    end
-
+    local friendCount = 0  -- Track the number of friends
     local options = {
-        { text = "+20 HP", action = function() player.hp = math.min(player.hp + 20, 100)
-        updateHPDisplay()
-        end },
-        { text = "+1 Speed", action = function() player.moveSpeed = player.moveSpeed + 1
-        updateMoveSpeedText()
-        end },
-        { text = "+5 Bullet Damage", action = function() player.bulletDamage = player.bulletDamage + 5
-        updateBulletDamageText()
-        end },
-        { 
-            text = "+1 Friend",
-            action = function()
-                    createFriend()  -- Kutsu luontifunktiota
-                    updateFriendCountText()  -- Päivitä tekstin näyttö
+        { text = "+20 HP", action = 
+            function() 
+                player.hp = math.min(player.hp + 20, 100) 
+            end },
+        { text = "+1 Speed", action = 
+            function() 
+                player.moveSpeed = player.moveSpeed + 1
+                updateMoveSpeedText()
+            end },
+        { text = "+5 Bullet Damage", action = 
+            function() 
+                player.bulletDamage = player.bulletDamage + 5
+                updateBulletDamageText()
+            end },
+        { text = "+1 Friend", action = 
+            function()
+                createFriend()  -- Kutsu luontifunktiota
+                updateFriendCountText()  -- Päivitä tekstin näyttö
             end
         }
     }
 
-
     friendCountText:toFront()
-
-
-
-
 
     -- Shuffle options and pick 3 random ones
     local shuffledOptions = {}
@@ -577,8 +957,8 @@ local function showLevelUpScreen()
     -- Create buttons for the options
     local buttons = {}
     for i, option in ipairs(shuffledOptions) do
-        local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 24)
-        button:setFillColor(0, 0, 0)
+        local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 30)
+        button:setFillColor(1, 1, 0)
 
         -- Button tap action
         button:addEventListener("tap", function()
@@ -590,8 +970,8 @@ local function showLevelUpScreen()
             for _, b in ipairs(buttons) do
                 display.remove(b)
             end
-            resumeGame()
-            
+            audio.play(FXfiles.perkChosen,{ channel = channels.explosion })
+            resumeGame()  -- Resume the game
         end)
 
         table.insert(buttons, button)
@@ -613,6 +993,10 @@ local function moveEnemies()
         local distance = math.sqrt(dx^2 + dy^2)
         local speed = 2
 
+        if enemy.isBoss then
+            speed = (speed * currentLevel) / 3
+        end
+
         if distance > 0 then
             enemy.model.x = enemy.model.x + (dx / distance) * speed
             enemy.model.y = enemy.model.y + (dy / distance) * speed
@@ -623,6 +1007,12 @@ local function moveEnemies()
             player.hp = player.hp - enemy.damage
             print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
             updateHPDisplay()
+
+            if enemy.isBoss then
+                bosslLevels[currentLevel].isDead = true
+            end
+            audio.stop( channels.explosion )
+            audio.play(FXfiles.playerHit,{ channel = channels.explosion })
             display.remove(enemy.model)
             table.remove(enemies, i)
         end
@@ -644,8 +1034,25 @@ local function moveBullets()
             local distance = math.sqrt(dx^2 + dy^2)
             if distance < 40 + 5 then
                 enemy.hp = enemy.hp - bullet.damage
-                print("Viholliseen osui! HP:", enemy.hp)
-                if enemy.hp <= 0 then
+                if enemy.isBoss then
+                    print("Bossiin osui! HP:", enemy.hp)
+                else
+                    --print("Viholliseen osui! HP:", enemy.hp)
+                end
+
+                audio.stop( channels.explosion )
+                if enemy.hp <= 0 then 
+                    audio.play(FXfiles.enemyDie,{ channel = channels.explosion })
+                else
+                    audio.play(FXfiles.enemyDamage,{ channel = channels.explosion })
+                end
+
+                    if enemy.hp <= 0 then
+                    if enemy.isBoss then
+                        bosslLevels[currentLevel].isDead = true
+                    end
+
+                    enemyDown(enemy)
                     player.exp = player.exp + enemy.exp
                     print("Vihollinen kuoli! EXP:", player.exp)
 
@@ -656,11 +1063,16 @@ local function moveBullets()
                     end
 
                     if player.exp >= levelUpExpThreshold then
-                        player.exp = 0
+                        -- player.exp = 0
                         player.level = player.level + 1
+                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
                         print("Taso nousi! Nykyinen taso:", player.level)
                         updateLevelText()
                         showLevelUpScreen()
+                        playerLevelUpMusic(player.level)
+                        checkGunUpgrades()
+                        increaselevelUpExpThreshold()
+                        print("Level up threshold increased to:", levelUpExpThreshold)
                     end
 
                     -- Lisää splatter kupla-hajoamispisteeseen
@@ -709,11 +1121,16 @@ local function moveFriendBullets()
                     end
 
                     if player.exp >= levelUpExpThreshold then
-                        player.exp = 0
+                        -- player.exp = 0
                         player.level = player.level + 1
+                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
                         print("Taso nousi! Nykyinen taso:", player.level)
                         updateLevelText()
                         showLevelUpScreen()
+                        playerLevelUpMusic(player.level)
+                        checkGunUpgrades()
+                        increaselevelUpExpThreshold()
+                        print("Level up threshold increased to:", levelUpExpThreshold)
                     end
 
                     -- Lisää splatter kupla-hajoamispisteeseen
@@ -741,7 +1158,6 @@ local function restartGame()
     player.hp = 100
     player.level = 1
     player.exp = 0
-   
     for i = #enemies, 1, -1 do
         display.remove(enemies[i])
         table.remove(enemies, i)
@@ -752,6 +1168,14 @@ local function restartGame()
         table.remove(friendList, i)
     end
 
+    if bosslLevels[currentLevel] ~= nil then
+        if  bosslLevels[currentLevel].bossResource.timer then
+
+            timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+            bosslLevels[currentLevel].bossResource.timer = nil
+        end
+    end
+    
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
@@ -762,8 +1186,11 @@ end
 
 -- Näytä Game Over ruutu
 local function showGameOverScreen()
-    pauseGame()
+    pauseGame()  -- Pause the game
+    pauseMusic()
 
+    audio.play(FXfiles.gameOver,{ channel = channels.explosion })
+    audio.play(FXfiles.gameoverSlap,{ channel = channels.background })
     -- Create game over screen
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
@@ -771,7 +1198,7 @@ local function showGameOverScreen()
     local title = display.newText("Game Over", centerX, centerY - 50, native.systemFontBold, 32)
     title:setFillColor(1, 0, 0)
 
-    local restartButton = display.newText("Restart", centerX, centerY + 50, native.systemFont, 24)
+    local restartButton = display.newText("Restart", centerX, centerY + 250, native.systemFont, 54)
     restartButton:setFillColor(1, 1, 0)
 
     restartButton:addEventListener("tap", restartGame)

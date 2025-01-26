@@ -2,7 +2,6 @@ application =
 {
 	showRuntimeErrors = false,
 	launchPad = false,
-
 	content =
 	{
 		width = 1080,
