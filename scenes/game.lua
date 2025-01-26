@@ -327,6 +327,224 @@ local enemies = {}
 local initialSpawnDelay = 5000 -- millisekuntia (5 sekuntia)
 local spawnDelay = initialSpawnDelay
 local maxEnemiesPerSpawn = 1 -- Määrä vihollisia per spawn (kasvaa tason mukaan)
+local currentLevel = 1
+local enemiesPerLevel = 1  * currentLevel * maxEnemiesPerSpawn -- Määrä vihollisia per taso (kasvaa tason mukaan)
+local totalEnemiesSpawned = 0
+local enemiesDown = 0
+
+local bosslLevels = { 
+    [4] = {
+        bossName = "Piranha",
+        bossResource = nil,
+        bossPicture1 = "assets/images/piranha.png",
+        bossPicture2 = "assets/images/piranha2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 200,
+        damage = 10,
+        exp = 200,
+        speedMultiplier = 1.5,
+    },
+    [6] = {
+        bossName = "Seahorse",
+        bossResource = nil,
+        bossPicture1 = "assets/images/seahorse.png",
+        bossPicture2 = "assets/images/seahorse2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 1500,
+        damage = 20,
+        exp = 700,
+        speedMultiplier = 2
+    },
+    [15] = {
+        bossName = "Swordfish",
+        bossResource = nil,
+        bossPicture1 = "assets/images/swordfish.png",
+        bossPicture2 = "assets/images/swordfish2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 20000,
+        damage = 50,
+        exp = 2000,
+        speedMultiplier = 2
+    },
+    [20] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 50000,
+        damage = 70,
+        exp = 10500,
+        speedMultiplier = 2
+    },
+    [25] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 300,
+        damage = 50,
+        exp = 100000,
+        speedMultiplier = 2
+    },
+    [30] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 350,
+        damage = 50,
+        exp = 100000000,
+        speedMultiplier = 2
+    },
+    [35] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 400,
+        damage = 50,
+        exp = 1000000000,
+        speedMultiplier = 2
+    },
+    [40] = {
+        bossName = "Hammerhead",
+        bossResource = nil,
+        bossPicture1 = "assets/images/hammerhead.png",
+        bossPicture2 = "assets/images/hammerhead2.png",
+        isSpawned = false,
+        isDead = false,
+        hp = 450,
+        damage = 50,
+        exp = 100000000000,
+        speedMultiplier = 2
+    }
+
+}
+
+local function enemyDown()
+    enemiesDown = enemiesDown + 1
+
+    if enemiesDown >= enemiesPerLevel then
+        -- ei voida edistää peliä jos bossi on olemassa
+        if bosslLevels[currentLevel] ~= nil and
+         bosslLevels[currentLevel].isSpawned == true and
+         bosslLevels[currentLevel].isDead == false
+          then
+            return
+        end
+
+        currentLevel = currentLevel + 1
+        enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
+        print("Taso", currentLevel, "aloittaa")
+        if bosslLevels[currentLevel] ~= nil then
+          if bosslLevels[currentLevel].isSpawned == false then
+            spawnBoss()
+          end
+        end
+    end
+
+end
+
+function spawnBoss()
+    print("Spawnataan boss")
+    local boss = {}
+    boss.model = display.newImageRect(camera, bosslLevels[currentLevel].bossPicture1, 100 * (currentLevel * 0.3), 100 * (currentLevel * 0.3))
+
+    local tempImage = display.newImage(bosslLevels[currentLevel].bossPicture1)
+    local imageWidth = tempImage.contentWidth
+    local imageHeight = tempImage.contentHeight
+    tempImage:removeSelf()
+
+    local desiredHeight = 100 * (currentLevel * 0.3)
+    local scaleFactor = desiredHeight / imageHeight
+    boss.model.height = desiredHeight
+    boss.model.width = imageWidth * scaleFactor
+
+    boss.x = display.contentCenterX
+    boss.y = display.contentCenterY
+    boss.hp = bosslLevels[currentLevel].hp
+    boss.damage = bosslLevels[currentLevel].damage
+    boss.exp = bosslLevels[currentLevel].exp
+    boss.isDead = false
+    boss.isBoss = true
+
+    print("bossPicture1: " .. bosslLevels[currentLevel].bossPicture1)
+    bosslLevels[currentLevel].isSpawned = true
+
+    bosslLevels[currentLevel].bossResource = boss
+
+    table.insert(enemies, boss)
+
+    local frame = 1
+    local function animateBoss()
+        print("animateBoss(): animoidaan bossi")
+        local boss = bosslLevels[currentLevel].bossResource
+        
+        if boss.isDead or not boss.model then
+            removeBoss(boss)
+            return
+        end
+        if boss.model.removeSelf == nil then
+            removeBoss(boss)
+            return
+        end
+        print("animateBoss(): animoidaan bossia EDELLEEN")
+        if frame == 1 then
+            boss.model.fill = { type = "image", filename = bosslLevels[currentLevel].bossPicture1 }
+            frame = 2
+        else
+            boss.model.fill = { type = "image", filename = bosslLevels[currentLevel].bossPicture2 } 
+            frame = 1
+        end
+        local dx = player.model.x - boss.model.x
+        local dy = player.model.y - boss.model.y
+        local angle = math.deg(math.atan2(dy, dx)) -- Kulma radiaaneista asteiksi
+
+        boss.model.rotation = angle
+
+        if dx < 0 then
+            boss.model.yScale = -1
+        else
+            boss.model.yScale = 1
+        end
+    end
+
+    -- Käynnistä animaatio 300 ms välein
+    bosslLevels[currentLevel].bossResource.timer = timer.performWithDelay(300, animateBoss, 0)
+end
+
+function removeBoss(boss)
+    print("removeBoss(): poistetaan boss")
+    if boss.timer then
+        timer.cancel(boss.timer)
+        boss.timer = nil
+    end
+    if boss.model.removeSelf then
+        boss.model:removeSelf()
+        boss.model = nil
+    end
+    boss.isDead = true
+
+    if bosslLevels[currentLevel].isDead then
+        bosslLevels[currentLevel].isDead = true
+    end
+
+    if bosslLevels[currentLevel].bossResource.timer then
+        timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+    end
+
+end
 
 -- Pelaajan tason vaikutus vihollisiin
 local function calculateEnemyStats()
@@ -349,7 +567,8 @@ local function spawnEnemy()
         model = display.newImageRect(camera, "assets/images/slime.png", 50, 50), -- Käytä ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
-        exp = math.random(5, 10) + (player.level - 1) * 1.15 -- EXP kasvaa tason mukana
+        exp = math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
+        isBoss = false
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
@@ -649,6 +868,10 @@ local function moveEnemies()
         local distance = math.sqrt(dx^2 + dy^2)
         local speed = 2
 
+        if enemy.isBoss then
+            speed = (speed * currentLevel) / 3
+        end
+
         if distance > 0 then
             enemy.model.x = enemy.model.x + (dx / distance) * speed
             enemy.model.y = enemy.model.y + (dy / distance) * speed
@@ -680,8 +903,13 @@ local function moveBullets()
             local distance = math.sqrt(dx^2 + dy^2)
             if distance < 40 + 5 then
                 enemy.hp = enemy.hp - bullet.damage
-                print("Viholliseen osui! HP:", enemy.hp)
+                if enemy.isBoss then
+                    print("Bossiin osui! HP:", enemy.hp)
+                else
+                    print("Viholliseen osui! HP:", enemy.hp)
+                end
                 if enemy.hp <= 0 then
+                    enemyDown(enemy)
                     player.exp = player.exp + enemy.exp
                     print("Vihollinen kuoli! EXP:", player.exp)
 
@@ -730,12 +958,18 @@ local function restartGame()
     player.hp = 100
     player.level = 1
     player.exp = 0
-   
     for i = #enemies, 1, -1 do
         display.remove(enemies[i])
         table.remove(enemies, i)
     end
 
+    if bosslLevels[currentLevel] ~= nil then
+        if  bosslLevels[currentLevel].bossResource.timer then
+
+            timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+        end
+    end
+    
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
@@ -759,7 +993,7 @@ local function showGameOverScreen()
     local title = display.newText("Game Over", centerX, centerY - 50, native.systemFontBold, 32)
     title:setFillColor(1, 0, 0)
 
-    local restartButton = display.newText("Restart", centerX, centerY + 50, native.systemFont, 24)
+    local restartButton = display.newText("Restart", centerX, centerY + 250, native.systemFont, 54)
     restartButton:setFillColor(1, 1, 0)
 
     restartButton:addEventListener("tap", restartGame)
