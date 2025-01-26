@@ -128,7 +128,9 @@ local FXfiles = {
     gameoverSlap = audio.loadSound("assets/audio/fx/environment/gameover_slap.wav"),
     lvlUp = audio.loadSound("assets/audio/fx/environment/lvl_up.wav"),
     perkChosen = audio.loadSound("assets/audio/fx/environment/perk_chosen.wav"),
-    waveClear = audio.loadSound("assets/audio/fx/environment/wave_clear_jingle.wav")
+    waveClear = audio.loadSound("assets/audio/fx/environment/wave_clear_jingle.wav"),
+    enemyDamage = audio.loadSound("assets/audio/fx/environment/enemy_damage.wav"),
+    enemyDie = audio.loadSound("assets/audio/fx/environment/enemy_die.wav")
 }
 
 local function getIntensityByLevel(level)
@@ -966,7 +968,15 @@ local function moveBullets()
                 else
                     --print("Viholliseen osui! HP:", enemy.hp)
                 end
-                if enemy.hp <= 0 then
+
+                audio.stop( channels.explosion )
+                if enemy.hp <= 0 then 
+                    audio.play(FXfiles.enemyDie,{ channel = channels.explosion })
+                else
+                    audio.play(FXfiles.enemyDamage,{ channel = channels.explosion })
+                end
+
+                    if enemy.hp <= 0 then
                     if enemy.isBoss then
                         bosslLevels[currentLevel].isDead = true
                     end
