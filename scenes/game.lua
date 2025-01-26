@@ -64,7 +64,7 @@ local musicFiles = {
             melody = audio.loadSound("assets/audio/rising_threat/rising_threat_melodia_hard.mp3")
         }
     },
-    boss = {
+    wrath_unleashed = {
         easy = {
             drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_rummut_easy.mp3"),
             melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_3_melodia_easy.mp3")
@@ -138,7 +138,7 @@ local FXfiles = {
 local function getIntensityByLevel(level)
     if level <= 5 then
         return "easy"
-    elseif level <= 7 then
+    elseif level <= 6 then
         return "medium"
     else
         return "hard"
@@ -148,9 +148,11 @@ end
 function updateMusicIntensity()
     
     if player.level >= 5 and currentLevel > 5 then
+        -- sorry not yet working changing system
         music = musicFiles.wrath_unleashed[intensityLvl]
     else
-        music = musicFiles.rising_threat[intensityLvl]
+        -- music = musicFiles.rising_threat[intensityLvl]
+        music = musicFiles.wrath_unleashed[intensityLvl]
     end
     playMusic()
     pauseMelody()
@@ -627,11 +629,12 @@ local function spawnEnemy()
 
     -- Luo vihollinen kuvatiedostolla
     local enemy = {
-        model = display.newImageRect(camera, "assets/images/slime.png", 50, 50), -- Käytä ensimmäistä kuvaa
+        model = display.newImageRect(camera, "assets/images/slime1.png", 50, 50), -- Käytä ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
         exp = math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
-        isBoss = false
+        isBoss = false,
+        variant = 2 * math.random(3) - 1
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
@@ -665,10 +668,10 @@ local function spawnEnemy()
             return
         end
         if frame == 1 then
-            enemy.model.fill = { type = "image", filename = "assets/images/slime2.png" }
+            enemy.model.fill = { type = "image", filename = "assets/images/slime" .. enemy.variant .. ".png" }
             frame = 2
         else
-            enemy.model.fill = { type = "image", filename = "assets/images/slime.png" }
+            enemy.model.fill = { type = "image", filename = "assets/images/slime" .. (enemy.variant + 1).. ".png" }
             frame = 1
         end
     end
