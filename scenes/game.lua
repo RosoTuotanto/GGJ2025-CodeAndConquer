@@ -763,8 +763,6 @@ local function fireBullet(event)
         audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
         
 
-        local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
-
         if #friendList > 0 then
             for i=1, #friendList do
                 table.insert(shooter,friendList[i])
@@ -773,7 +771,7 @@ local function fireBullet(event)
 
         for i=1, #shooter do
 
-            -- local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+            local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
 
             local origin = shooter[i]
 
