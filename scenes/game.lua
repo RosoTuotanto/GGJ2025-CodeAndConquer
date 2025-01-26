@@ -371,7 +371,7 @@ local totalEnemiesSpawned = 0
 local enemiesDown = 0
 
 local bosslLevels = { 
-    [2] = {
+    [5] = {
         bossName = "Piranha",
         bossResource = nil,
         bossPicture1 = "assets/images/piranha.png",
@@ -383,43 +383,43 @@ local bosslLevels = {
         exp = 200,
         speedMultiplier = 1.5,
     },
-    [3] = {
+    [8] = {
         bossName = "Seahorse",
         bossResource = nil,
         bossPicture1 = "assets/images/seahorse.png",
         bossPicture2 = "assets/images/seahorse2.png",
         isSpawned = false,
         isDead = false,
-        hp = 1500,
+        hp = 100,
         damage = 20,
         exp = 700,
         speedMultiplier = 2
     },
-    [4] = {
+    [12] = {
         bossName = "Swordfish",
         bossResource = nil,
         bossPicture1 = "assets/images/swordfish.png",
         bossPicture2 = "assets/images/swordfish2.png",
         isSpawned = false,
         isDead = false,
-        hp = 20000,
+        hp = 200,
         damage = 50,
         exp = 2000,
         speedMultiplier = 2
     },
-    [5] = {
+    [15] = {
         bossName = "Hammerhead",
         bossResource = nil,
         bossPicture1 = "assets/images/hammerhead.png",
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 50000,
+        hp = 500,
         damage = 70,
         exp = 10500,
         speedMultiplier = 2
     },
-    [6] = {
+    [17] = {
         bossName = "Hammerhead",
         bossResource = nil,
         bossPicture1 = "assets/images/hammerhead.png",
@@ -531,10 +531,21 @@ function spawnBoss()
         
         if boss.isDead or not boss.model then
             removeBoss(boss)
+            if bosslLevels[currentLevel].bossResource.timer then timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+                bosslLevels[currentLevel].bossResource.timer = nil
+            end
+            if boss.timer then timer.cancel(boss.timer)
+            end
+            
             return
         end
         if boss.model.removeSelf == nil then
             removeBoss(boss)
+            if bosslLevels[currentLevel].bossResource.timer then timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+                bosslLevels[currentLevel].bossResource.timer = nil
+            end
+            if boss.timer then timer.cancel(boss.timer)
+            end
             return
         end
         -- print("animateBoss(): animoidaan bossia EDELLEEN")
@@ -564,17 +575,20 @@ end
 
 function removeBoss(boss)
     print("removeBoss(): poistetaan boss")
-    if boss.timer then
-        timer.cancel(boss.timer)
-        boss.timer = nil
+    if boss ~= nil then
+            
+        if boss.timer then
+            timer.cancel(boss.timer)
+            boss.timer = nil
+        end
+        if boss.model.removeSelf then
+            boss.model:removeSelf()
+            boss.model = nil
+        end
+        boss.isDead = true
     end
-    if boss.model.removeSelf then
-        boss.model:removeSelf()
-        boss.model = nil
-    end
-    boss.isDead = true
 
-    if bosslLevels[currentLevel].isDead then
+    if bosslLevels[currentLevel] then
         bosslLevels[currentLevel].isDead = true
     end
 
@@ -734,24 +748,15 @@ local function fireBullet(event)
         local shooter = {player.model}
         audio.stop(channels.gunshot)
         audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+        
 
-        local bullet = display.newImageRect( camera, "/assets/images/bubble".. player.gunlevel ..".png", 40, 40 )
-
-        bullet.x = player.model.x
-        bullet.y = player.model.y
-        local dx = (cursorX - player.model.x)-camera.x
-        local dy = (cursorY - player.model.y)-camera.y
-        local distance = math.sqrt(dx^2 + dy^2)
+    local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
 
         if #friendList > 0 then
             for i=1, #friendList do
                 table.insert(shooter,friendList[i])
             end
-            
         end
-        bullet.vx = (dx / distance) * player.bulletSpeed
-        bullet.vy = (dy / distance) * player.bulletSpeed
-        bullet.damage = player.bulletDamage -- Käytä pelaajan vahinkoa
 
         for i=1, #shooter do
 
@@ -765,9 +770,9 @@ local function fireBullet(event)
             local dy = (cursorY - origin.y)-camera.y
             local distance = math.sqrt(dx^2 + dy^2)
 
-            bullet.vx = (dx / distance) * 10
-            bullet.vy = (dy / distance) * 10
-            
+            bullet.vx = (dx / distance) * player.bulletSpeed
+            bullet.vy = (dy / distance) * player.bulletSpeed
+
             local damageMultiplier = origin == player.model and 1 or 0.5
             bullet.damage = player.bulletDamage*damageMultiplier-- Käytä pelaajan vahinkoa
 
@@ -776,7 +781,34 @@ local function fireBullet(event)
     end
 end
 
+local isShooting = false
+local autoFireTimer = nil
 
+local function startAutoFire()
+    fireBullet()
+    if not isShooting then
+        isShooting = true
+        autoFireTimer = timer.performWithDelay(300 / player.gunlevel * 2, fireBullet, 0) -- Ammu 200 ms välein
+    end
+end
+
+local function stopAutoFire()
+    if isShooting then
+        isShooting = false
+        if autoFireTimer then
+            timer.cancel(autoFireTimer)
+            autoFireTimer = nil
+        end
+    end
+end
+
+local function onTouch(event)
+    if event.phase == "began" then
+        startAutoFire()
+    elseif event.phase == "ended" or event.phase == "cancelled" then
+        stopAutoFire()
+    end
+end
 
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
@@ -1104,12 +1136,14 @@ local function restartGame()
         if  bosslLevels[currentLevel].bossResource.timer then
 
             timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+            bosslLevels[currentLevel].bossResource.timer = nil
         end
     end
     
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
+    Runtime:removeEventListener("touch", onTouch)
     composer.removeScene("scenes.game")
     composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
 end
@@ -1167,7 +1201,7 @@ function scene:show(event)
 
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
-        Runtime:addEventListener("touch", fireBullet)
+        Runtime:addEventListener("touch", onTouch)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
     end
@@ -1178,7 +1212,7 @@ function scene:hide(event)
     local sceneGroup = self.view
     if event.phase == "will" then
         Runtime:removeEventListener("key", onKeyEvent)
-        Runtime:removeEventListener("touch", fireBullet)
+        Runtime:removeEventListener("touch", onTouch)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
     end
