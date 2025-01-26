@@ -762,7 +762,7 @@ local function fireBullet(event)
         audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
         
 
-    local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
+        local bullet = display.newImageRect(camera, "/assets/images/bubble" .. player.gunlevel .. ".png", 40, 40)
 
         if #friendList > 0 then
             for i=1, #friendList do
@@ -793,34 +793,36 @@ local function fireBullet(event)
     end
 end
 
-local isShooting = false
-local autoFireTimer = nil
+-- AUTOFIRE MEKANIIKKA
 
-local function startAutoFire()
-    fireBullet()
-    if not isShooting then
-        isShooting = true
-        autoFireTimer = timer.performWithDelay(300 / player.gunlevel * 2, fireBullet, 0) -- Ammu 200 ms välein
-    end
-end
+-- local isShooting = false
+-- local autoFireTimer = nil
 
-local function stopAutoFire()
-    if isShooting then
-        isShooting = false
-        if autoFireTimer then
-            timer.cancel(autoFireTimer)
-            autoFireTimer = nil
-        end
-    end
-end
+-- local function startAutoFire()
+--     fireBullet()
+--     if not isShooting then
+--         isShooting = true
+--         autoFireTimer = timer.performWithDelay(300 / player.gunlevel * 2, fireBullet, 0) -- Ammu 200 ms välein
+--     end
+-- end
 
-local function onTouch(event)
-    if event.phase == "began" then
-        startAutoFire()
-    elseif event.phase == "ended" or event.phase == "cancelled" then
-        stopAutoFire()
-    end
-end
+-- local function stopAutoFire()
+--     if isShooting then
+--         isShooting = false
+--         if autoFireTimer then
+--             timer.cancel(autoFireTimer)
+--             autoFireTimer = nil
+--         end
+--     end
+-- end
+
+-- local function onTouch(event)
+--     if event.phase == "began" then
+--         startAutoFire()
+--     elseif event.phase == "ended" or event.phase == "cancelled" then
+--         stopAutoFire()
+--     end
+-- end
 
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
@@ -1164,7 +1166,7 @@ local function restartGame()
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
-    Runtime:removeEventListener("touch", onTouch)
+    -- Runtime:removeEventListener("touch", onTouch)
     composer.removeScene("scenes.game")
     composer.gotoScene("scenes.game", { effect = "fade", time = 500 })
 end
@@ -1222,7 +1224,7 @@ function scene:show(event)
 
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
-        Runtime:addEventListener("touch", onTouch)
+        Runtime:addEventListener("touch", fireBullet)
         Runtime:addEventListener("mouse", onMouseEvent)
         Runtime:addEventListener("enterFrame", gameLoop)
     end
@@ -1233,7 +1235,7 @@ function scene:hide(event)
     local sceneGroup = self.view
     if event.phase == "will" then
         Runtime:removeEventListener("key", onKeyEvent)
-        Runtime:removeEventListener("touch", onTouch)
+        Runtime:removeEventListener("touch", fireBullet)
         Runtime:removeEventListener("mouse", onMouseEvent)
         Runtime:removeEventListener("enterFrame", gameLoop)
     end
