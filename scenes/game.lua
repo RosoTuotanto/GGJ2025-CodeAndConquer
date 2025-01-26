@@ -956,7 +956,7 @@ local function showLevelUpScreen()
     local buttons = {}
     for i, option in ipairs(shuffledOptions) do
         local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 30)
-        button:setFillColor(1, 1, 0)
+        button:setFillColor(0, 0, 0)
 
         -- Button tap action
         button:addEventListener("tap", function()
