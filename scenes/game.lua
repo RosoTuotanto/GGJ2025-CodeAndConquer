@@ -47,7 +47,7 @@ local gunshotSounds = {
 local gunshotSound = audio.loadSound( gunshotSounds.gunlevel1 )
 
 
-local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 }
+local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 , pickup = 7}
 
 local musicFiles = {
     rising_threat = {
@@ -130,7 +130,9 @@ local FXfiles = {
     perkChosen = audio.loadSound("assets/audio/fx/environment/perk_chosen.wav"),
     waveClear = audio.loadSound("assets/audio/fx/environment/wave_clear_jingle.wav"),
     enemyDamage = audio.loadSound("assets/audio/fx/environment/enemy_damage.wav"),
-    enemyDie = audio.loadSound("assets/audio/fx/environment/enemy_die.wav")
+    enemyDie = audio.loadSound("assets/audio/fx/environment/enemy_die.wav"),
+    playerHit = audio.loadSound("assets/audio/fx/environment/player_hit.wav"),
+    healthPickup = audio.loadSound("assets/audio/fx/environment/health_pickup.wav")
 }
 
 local function getIntensityByLevel(level)
@@ -743,7 +745,8 @@ local function checkHpPackCollision()
         if distance < 60 + 10 then
             player.hp = math.min(player.hp + 20, 100)
             print("Pelaajan HP:", player.hp)
-
+            audio.stop( channels.pickup )
+            audio.play( FXfiles.healthPickup, { channel = channels.pickup, loops = 0, fadein = 0, fadeout = 0 } )
             display.remove(hpPack)
             table.remove(hpPacks, i)
             updateHPDisplay()
@@ -998,7 +1001,8 @@ local function moveEnemies()
             if enemy.isBoss then
                 bosslLevels[currentLevel].isDead = true
             end
-
+            audio.stop( channels.explosion )
+            audio.play(FXfiles.playerHit,{ channel = channels.explosion })
             display.remove(enemy.model)
             table.remove(enemies, i)
         end
