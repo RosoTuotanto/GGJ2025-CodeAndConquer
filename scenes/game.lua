@@ -169,8 +169,8 @@ end
 friendCountText:setFillColor(0, 0, 0)
 
 local background = display.newImageRect( "/assets/images/uibubblelvl.png", 150, 150)
-background.x = 960
-background.y = 1000
+background.x = 952
+background.y = 990
 
 local levelText = display.newText({
     text = player.level,
@@ -193,8 +193,8 @@ background.y = 1000
 
 local hpText = display.newText({
     text = player.hp,
-    x = 65,
-    y = 990,
+    x = 75,
+    y = 997,
     font = native.systemFont,
     fontSize = 27,
     fontColor = blue
@@ -204,8 +204,8 @@ hpText:setFillColor(1, 0, 0)
 
 local hpText2 = display.newText({
     text = "100",
-    x = 113,
-    y = 1001,
+    x = 123,
+    y = 1021,
     font = native.systemFont,
     fontSize = 27,
 })
@@ -521,9 +521,14 @@ local function showLevelUpScreen()
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
 
+    local bubble = display.newImageRect("assets/images/uibubble5.png", 400, 400)  -- Muokkaa kokoa tarvittaessa
+    bubble.x = centerX
+    bubble.y = centerY
+    bubble:toFront() 
+
 
     local title = display.newText("Level Up!", centerX, centerY - 100, native.systemFontBold, 32)
-    title:setFillColor(1, 1, 1)
+    title:setFillColor(0, 0, 0)
 
 
     -- Funktio, joka luo uuden ystävän
@@ -573,7 +578,7 @@ local function showLevelUpScreen()
     local buttons = {}
     for i, option in ipairs(shuffledOptions) do
         local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 24)
-        button:setFillColor(1, 1, 0)
+        button:setFillColor(0, 0, 0)
 
         -- Button tap action
         button:addEventListener("tap", function()
