@@ -134,15 +134,20 @@ local FXfiles = {
 local function getIntensityByLevel(level)
     if level <= 5 then
         return "easy"
-    elseif level <= 10 then
+    elseif level <= 7 then
         return "medium"
     else
         return "hard"
     end
 end
 
-local function updateMusicIntensity()
-    music = musicFiles.rising_threat[intensityLvl]
+function updateMusicIntensity()
+    
+    if player.level >= 5 and currentLevel > 5 then
+        music = musicFiles.wrath_unleashed[intensityLvl]
+    else
+        music = musicFiles.rising_threat[intensityLvl]
+    end
     playMusic()
     pauseMelody()
 end
@@ -175,7 +180,7 @@ local playerImages = {
 }
 
 
-local player = {
+player = {
     model = display.newImageRect(camera, playerImages[1], 120, 120), -- Käytä kuvaa pelaajahahmona
     currentFrame = 1,
     hp = 100,
@@ -334,7 +339,7 @@ local enemies = {}
 local initialSpawnDelay = 5000 -- millisekuntia (5 sekuntia)
 local spawnDelay = initialSpawnDelay
 local maxEnemiesPerSpawn = 1 -- Määrä vihollisia per spawn (kasvaa tason mukaan)
-local currentLevel = 1
+currentLevel = 1 -- käytännössä määrää pelin kulun!
 local enemiesPerLevel = 1  * currentLevel * maxEnemiesPerSpawn -- Määrä vihollisia per taso (kasvaa tason mukaan)
 local totalEnemiesSpawned = 0
 local enemiesDown = 0
@@ -359,7 +364,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/seahorse2.png",
         isSpawned = false,
         isDead = false,
-        hp = 100,
+        hp = 2000,
         damage = 20,
         exp = 700,
         speedMultiplier = 2
@@ -371,7 +376,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/swordfish2.png",
         isSpawned = false,
         isDead = false,
-        hp = 200,
+        hp = 3500,
         damage = 50,
         exp = 2000,
         speedMultiplier = 2
@@ -383,7 +388,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 500,
+        hp = 15000,
         damage = 70,
         exp = 10500,
         speedMultiplier = 2
@@ -454,6 +459,8 @@ local function enemyDown()
         currentLevel = currentLevel + 1
         enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
         print("Taso", currentLevel, "aloittaa")
+        print("vihuja nitistettävä", enemiesPerLevel, "!")
+        print("enemiesDown", enemiesDown)
         if bosslLevels[currentLevel] ~= nil then
           if bosslLevels[currentLevel].isSpawned == false then
             spawnBoss()
