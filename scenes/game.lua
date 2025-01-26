@@ -284,6 +284,7 @@ end
 player.boostSpeed = player.moveSpeed*5
 player.boostDuration = 80
 player.isBoosting = false
+player.gunlevel = 1
 
 -- Asetetaan pelaajan hahmo aloituskohtaan
 player.model.x = centerX
@@ -325,26 +326,32 @@ local function checkGunUpgrades()
     if  player.bulletDamage >= 70 then    
         gunshotSound = gunshotSounds.gunlevel7
         player.bulletSpeed = 70/1
+        player.gunlevel = 6
 
     elseif player.bulletDamage >= 60 then
         gunshotSound = gunshotSounds.gunlevel6
         player.bulletSpeed = 70/2
+        player.gunlevel = 5
 
     elseif player.bulletDamage >= 50 then
         gunshotSound = gunshotSounds.gunlevel5
         player.bulletSpeed = 70/3
+        player.gunlevel = 4
 
     elseif player.bulletDamage >= 40 then
         gunshotSound = gunshotSounds.gunlevel4
         player.bulletSpeed = 70/4
+        player.gunlevel = 3
 
     elseif player.bulletDamage >= 20 then
         gunshotSound = gunshotSounds.gunlevel3
         player.bulletSpeed = 70/5
+        player.gunlevel = 2
 
     elseif player.bulletDamage >= 15 then
         gunshotSound = gunshotSounds.gunlevel2
         player.bulletSpeed = 70/6
+        player.gunlevel = 1
 
     else
         gunshotSound = gunshotSounds.gunlevel1
@@ -364,7 +371,7 @@ local totalEnemiesSpawned = 0
 local enemiesDown = 0
 
 local bosslLevels = { 
-    [4] = {
+    [2] = {
         bossName = "Piranha",
         bossResource = nil,
         bossPicture1 = "assets/images/piranha.png",
@@ -376,7 +383,7 @@ local bosslLevels = {
         exp = 200,
         speedMultiplier = 1.5,
     },
-    [6] = {
+    [3] = {
         bossName = "Seahorse",
         bossResource = nil,
         bossPicture1 = "assets/images/seahorse.png",
@@ -388,7 +395,7 @@ local bosslLevels = {
         exp = 700,
         speedMultiplier = 2
     },
-    [15] = {
+    [4] = {
         bossName = "Swordfish",
         bossResource = nil,
         bossPicture1 = "assets/images/swordfish.png",
@@ -400,7 +407,7 @@ local bosslLevels = {
         exp = 2000,
         speedMultiplier = 2
     },
-    [20] = {
+    [5] = {
         bossName = "Hammerhead",
         bossResource = nil,
         bossPicture1 = "assets/images/hammerhead.png",
@@ -412,7 +419,7 @@ local bosslLevels = {
         exp = 10500,
         speedMultiplier = 2
     },
-    [25] = {
+    [6] = {
         bossName = "Hammerhead",
         bossResource = nil,
         bossPicture1 = "assets/images/hammerhead.png",
@@ -497,7 +504,7 @@ function spawnBoss()
     local imageHeight = tempImage.contentHeight
     tempImage:removeSelf()
 
-    local desiredHeight = 100 * (currentLevel * 0.3)
+    local desiredHeight = 100 * (currentLevel * 0.5)
     local scaleFactor = desiredHeight / imageHeight
     boss.model.height = desiredHeight
     boss.model.width = imageWidth * scaleFactor
@@ -519,7 +526,7 @@ function spawnBoss()
 
     local frame = 1
     local function animateBoss()
-        print("animateBoss(): animoidaan bossi")
+        -- print("animateBoss(): animoidaan bossi")
         local boss = bosslLevels[currentLevel].bossResource
         
         if boss.isDead or not boss.model then
@@ -530,7 +537,7 @@ function spawnBoss()
             removeBoss(boss)
             return
         end
-        print("animateBoss(): animoidaan bossia EDELLEEN")
+        -- print("animateBoss(): animoidaan bossia EDELLEEN")
         if frame == 1 then
             boss.model.fill = { type = "image", filename = bosslLevels[currentLevel].bossPicture1 }
             frame = 2
@@ -728,7 +735,7 @@ local function fireBullet(event)
         audio.stop(channels.gunshot)
         audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
 
-        local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
+        local bullet = display.newImageRect( camera, "/assets/images/bubble".. player.gunlevel ..".png", 40, 40 )
 
         bullet.x = player.model.x
         bullet.y = player.model.y
@@ -946,6 +953,11 @@ local function moveEnemies()
             player.hp = player.hp - enemy.damage
             print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
             updateHPDisplay()
+
+            if enemy.isBoss then
+                bosslLevels[currentLevel].isDead = true
+            end
+
             display.remove(enemy.model)
             table.remove(enemies, i)
         end
@@ -970,9 +982,13 @@ local function moveBullets()
                 if enemy.isBoss then
                     print("Bossiin osui! HP:", enemy.hp)
                 else
-                    print("Viholliseen osui! HP:", enemy.hp)
+                    --print("Viholliseen osui! HP:", enemy.hp)
                 end
                 if enemy.hp <= 0 then
+                    if enemy.isBoss then
+                        bosslLevels[currentLevel].isDead = true
+                    end
+
                     enemyDown(enemy)
                     player.exp = player.exp + enemy.exp
                     print("Vihollinen kuoli! EXP:", player.exp)
