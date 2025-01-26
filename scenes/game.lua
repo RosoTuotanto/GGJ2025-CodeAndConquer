@@ -17,6 +17,18 @@ local screenH = display.contentHeight
 -- Lisää pelikenttä kameraan
 camera:insert(object)
 
+native.setProperty( "mouseCursor", "crosshair" )
+native.setProperty( "mouseCursorVisible", false)
+local crosshair = display.newImageRect("assets/images/crosshair.png", 64, 64)
+crosshair.isVisible = false
+local function onMouseMove(event)
+    crosshair.x = event.x
+    crosshair.y = event.y
+    crosshair.isVisible = true
+end
+
+Runtime:addEventListener("mouse", onMouseMove)
+
 --------------------------------------------------
 -- AUDIO & MUSIC ------
 --------------------------------------------------
@@ -32,7 +44,7 @@ local gunshotSounds = {
     gunlevel7 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" )
 }
 
-local gunshotSound = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" )
+local gunshotSound = audio.loadSound( gunshotSounds.gunlevel1 )
 
 
 local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 }
@@ -460,9 +472,10 @@ end
 
 -- Pelaajan ampuminen
 local function fireBullet(event)
-    audio.stop(channels.gunshot)
-    audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
     if event.phase == "began" then
+        audio.stop(channels.gunshot)
+        audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
+
         local bullet = display.newImageRect( camera, "/assets/images/bubble6.png", 40, 40 )
 
         bullet.x = player.model.x
