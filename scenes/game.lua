@@ -21,10 +21,21 @@ camera:insert(object)
 -- AUDIO & MUSIC ------
 --------------------------------------------------
 audio.setVolume( 1 )
+
+local gunshotSounds = {
+    gunlevel1 = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" ),
+    gunlevel2 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel3 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel4 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel5 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel6 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
+    gunlevel7 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" )
+}
+
 local gunshotSound = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" )
+
+
 local channels = { gunshot = 1 , explosion = 2 , enemy = 3 , background = 4 , music_drums = 5, music_melody = 6 }
-local drums = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_drums_hard.wav")
-local melody = audio.loadSound("assets/audio/wrath_unleashed/wrath_unleashed_melody_hard.wav")
 
 local musicFiles = {
     rising_threat = {
@@ -71,18 +82,17 @@ local musicFiles = {
     -- }
 }
 
-
-local music = musicFiles.rising_threat.hard   
+local music = musicFiles.rising_threat.easy   
+local intensityLvl = "easy"
 
 local function playMusic()
     audio.stop(channels.music_drums)
     audio.stop(channels.music_melody)
-    audio.setVolume( 0.75, { channel = channels.music_drums } )
-    audio.setVolume( 0.75, {  channel = channels.music_melody} )
+    audio.setVolume( 0.55, { channel = channels.music_drums } )
+    audio.setVolume( 0.55, {  channel = channels.music_melody} )
     audio.play( music.drums, { channel = channels.music_drums, loops = -1 } )
     audio.play( music.melody, { channel = channels.music_melody, loops = -1 } )
 end
-
 
 local function pauseMelody()
     audio.stop(channels.music_melody)
@@ -94,6 +104,46 @@ end
 
 local function resumeMusic()
     playMusic()
+end
+
+local function pauseMusic()
+    audio.stop(channels.music_drums)
+    audio.stop(channels.music_melody)
+end
+
+local FXfiles = {   
+    gameover = audio.loadSound("assets/audio/fx/environment/gameover_jingle.wav"),
+    gameoverSlap = audio.loadSound("assets/audio/fx/environment/gameover_slap.wav"),
+    lvlUp = audio.loadSound("assets/audio/fx/environment/lvl_up.wav"),
+    perkChosen = audio.loadSound("assets/audio/fx/environment/perk_chosen.wav"),
+    waveClear = audio.loadSound("assets/audio/fx/environment/wave_clear_jingle.wav")
+}
+
+local function getIntensityByLevel(level)
+    if level <= 5 then
+        return "easy"
+    elseif level <= 10 then
+        return "medium"
+    else
+        return "hard"
+    end
+end
+
+local function updateMusicIntensity()
+    music = musicFiles.rising_threat[intensityLvl]
+    playMusic()
+    pauseMelody()
+end
+
+local function playerLevelUpMusic(playerlevel)
+    
+    local intensity = getIntensityByLevel(playerlevel)
+    if intensity ~= intensityLvl then
+        intensityLvl = intensity
+        print("intensity CHANGED", intensityLvl)
+        updateMusicIntensity()
+    end
+
 end
 
 playMusic()
@@ -119,8 +169,9 @@ local player = {
     hp = 100,
     exp = 0,
     level = 1,
-    moveSpeed = 5,
+    moveSpeed = 2,
     bulletDamage = 10,
+    bulletSpeed = 10,
 }
 
 local background = display.newImageRect( "/assets/images/uibubble2.png", 1850, 150)
@@ -253,6 +304,43 @@ timer.performWithDelay(animationInterval, animatePlayer, 0) -- Toista loputtomas
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
 
+local function increaselevelUpExpThreshold() 
+    levelUpExpThreshold = (levelUpExpThreshold * player.level / 2) * 1.1
+end
+
+local function checkGunUpgrades()
+    
+    if  player.bulletDamage >= 70 then    
+        gunshotSound = gunshotSounds.gunlevel7
+        player.bulletSpeed = 70/1
+
+    elseif player.bulletDamage >= 60 then
+        gunshotSound = gunshotSounds.gunlevel6
+        player.bulletSpeed = 70/2
+
+    elseif player.bulletDamage >= 50 then
+        gunshotSound = gunshotSounds.gunlevel5
+        player.bulletSpeed = 70/3
+
+    elseif player.bulletDamage >= 40 then
+        gunshotSound = gunshotSounds.gunlevel4
+        player.bulletSpeed = 70/4
+
+    elseif player.bulletDamage >= 20 then
+        gunshotSound = gunshotSounds.gunlevel3
+        player.bulletSpeed = 70/5
+
+    elseif player.bulletDamage >= 15 then
+        gunshotSound = gunshotSounds.gunlevel2
+        player.bulletSpeed = 70/6
+
+    else
+        gunshotSound = gunshotSounds.gunlevel1
+
+    end
+
+end
+
 -- Viholliset
 local enemies = {}
 local initialSpawnDelay = 5000 -- millisekuntia (5 sekuntia)
@@ -280,7 +368,7 @@ local function spawnEnemy()
         model = display.newImageRect(camera, "assets/images/slime.png", 50, 50), -- Käytä ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
-        exp = math.random(5, 10) + (player.level - 1) * 2 -- EXP kasvaa tason mukana
+        exp = math.random(5, 10) + (player.level - 1) * 1.15 -- EXP kasvaa tason mukana
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
@@ -411,11 +499,13 @@ local function fireBullet(event)
 
         if #friendList > 0 then
             for i=1, #friendList do
-
                 table.insert(shooter,friendList[i])
             end
             
         end
+        bullet.vx = (dx / distance) * player.bulletSpeed
+        bullet.vy = (dy / distance) * player.bulletSpeed
+        bullet.damage = player.bulletDamage -- Käytä pelaajan vahinkoa
 
         for i=1, #shooter do
 
@@ -568,7 +658,7 @@ local function showLevelUpScreen()
     -- Create buttons for the options
     local buttons = {}
     for i, option in ipairs(shuffledOptions) do
-        local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 24)
+        local button = display.newText(option.text, centerX, centerY + 40 * i, native.systemFont, 30)
         button:setFillColor(1, 1, 0)
 
         -- Button tap action
@@ -580,8 +670,8 @@ local function showLevelUpScreen()
             for _, b in ipairs(buttons) do
                 display.remove(b)
             end
-            resumeGame()
-            
+            audio.play(FXfiles.perkChosen,{ channel = channels.explosion })
+            resumeGame()  -- Resume the game
         end)
 
         table.insert(buttons, button)
@@ -646,11 +736,16 @@ local function moveBullets()
                     end
 
                     if player.exp >= levelUpExpThreshold then
-                        player.exp = 0
+                        -- player.exp = 0
                         player.level = player.level + 1
+                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
                         print("Taso nousi! Nykyinen taso:", player.level)
                         updateLevelText()
                         showLevelUpScreen()
+                        playerLevelUpMusic(player.level)
+                        checkGunUpgrades()
+                        increaselevelUpExpThreshold()
+                        print("Level up threshold increased to:", levelUpExpThreshold)
                     end
 
                     -- Lisää splatter kupla-hajoamispisteeseen
@@ -752,8 +847,11 @@ end
 
 -- Näytä Game Over ruutu
 local function showGameOverScreen()
-    pauseGame()
+    pauseGame()  -- Pause the game
+    pauseMusic()
 
+    audio.play(FXfiles.gameOver,{ channel = channels.explosion })
+    audio.play(FXfiles.gameoverSlap,{ channel = channels.background })
     -- Create game over screen
     local overlay = display.newRect(centerX, centerY, screenW, screenH)
     overlay:setFillColor(0, 0, 0, 0.8)
