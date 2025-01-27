@@ -24,10 +24,42 @@ native.setProperty( "mouseCursorVisible", false)
 local crosshair = display.newImageRect("assets/images/crosshair.png", 64, 64)
 crosshair.isVisible = false
 
+
+local laser -- Laser-objekti
+
+local function updateLaser(event)
+    if isPaused then return end
+    if not laser then
+        -- Luo laser vain kerran
+        laser = display.newLine(centerX, centerY, event.x, event.y)
+        laser:setStrokeColor(1, 0, 0, 0.6) -- Punainen laser
+        laser.strokeWidth = 3
+    else
+        -- Päivitä laserin alku- ja loppupisteet
+        laser = display.newLine(centerX, centerY, event.x, event.y)
+        laser:setStrokeColor(1, 0, 0, 0.6)
+        laser.strokeWidth = 3
+    end
+
+
+    -- Laserin fade-animaatio ja poisto
+    transition.to(laser, {
+        alpha = 0,
+        time = 50,
+        onComplete = function()
+            display.remove(laser)
+        end
+    })
+end
+
 local function onMouseMove(event)
     crosshair.x = event.x
     crosshair.y = event.y
     crosshair.isVisible = true
+
+    if event.isPrimaryButtonDown and player.laser then
+        updateLaser(event)
+    end
 end
 
 Runtime:addEventListener("mouse", onMouseMove)
@@ -204,6 +236,8 @@ player = {
     moveSpeed = 2,
     bulletDamage = 10,
     bulletSpeed = 10,
+    autofire = false,
+    laser = false
 }
 
 local background = display.newImageRect( "/assets/images/uibubble2.png", 1850, 150)
@@ -329,7 +363,102 @@ local function animatePlayer()
     player.model.fill = { type = "image", filename = playerImages[player.currentFrame] }
 end
 
+local gunImages = {
+    "/assets/images/gun.png",
+    "/assets/images/gun2.png",
+    "/assets/images/gun3.png"
+}
 
+local gunDisplay = nil
+local currentGunTransition = nil
+local currentGunImgLevel = 1
+
+
+local function createGunDisplay()
+    local gunLevel = math.min(player.gunlevel, #gunImages)
+    local gunImagePath = gunImages[gunLevel]
+    currentGunImgLevel = player.gunlevel
+    
+    gunDisplay = display.newImageRect(gunImagePath, 250, 250) 
+    gunDisplay.rotation = -25
+    gunDisplay.x = screenW - 250
+    gunDisplay.y = screenH - 175
+    gunDisplay.xScale = 0.001
+    gunDisplay.yScale = 0.001
+
+    local tempImage = display.newImage(gunImagePath)
+    local imageWidth = tempImage.contentWidth
+    local imageHeight = tempImage.contentHeight
+    tempImage:removeSelf()
+
+    local desiredHeight = 220
+    local scaleFactor = desiredHeight / imageHeight
+    gunDisplay.height = desiredHeight
+    gunDisplay.width = imageWidth * scaleFactor
+
+            
+    -- Ylös-alas liike animaatio
+    local function rotateCycle(gunmodel)
+        if gunmodel == nil then return end
+        currentGunTransition = transition.to(gunmodel, {
+            rotation = gunmodel.rotation + 50,
+            time = 1000,
+            transition = easing.inOutQuad,
+            onComplete = function()
+                -- Kun siirtyminen ylöspäin on valmis, aloita siirtyminen alas
+                currentGunTransition = transition.to(gunmodel, {
+                    rotation = gunmodel.rotation - 50,
+                    time = 1000,
+                    transition = easing.inOutQuad
+                    , onComplete = function()
+                        rotateCycle(gunmodel)
+                    end
+                })
+            end
+        })
+    end
+
+    transition.to(gunDisplay, {
+        xScale = 1,
+        yScale = 1,
+        time = 500,
+        transition = easing.inOutQuad,
+        onComplete = function()
+            rotateCycle(gunDisplay)
+        end
+        })
+
+
+end
+
+local function updateGunDisplay()
+    -- local tempRotation = -25
+
+    if gunDisplay then
+        if currentGunTransition then
+            if currentGunImgLevel == player.gunlevel then return end
+            transition.cancel(currentGunTransition)
+            transition.to(gunDisplay, {
+                xScale = 0,
+                yScale = 0,
+                time = 500,
+                transition = easing.inOutQuad,
+                onComplete = function()
+                    currentGunTransition = nil
+                    -- tempRotation = gunDisplay.rotation
+                    display.remove(gunDisplay)
+                    gunDisplay = nil
+                    createGunDisplay()
+                end
+                })
+                    
+        end
+    else
+        createGunDisplay()
+    end
+end
+
+updateGunDisplay()
 
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
@@ -344,36 +473,50 @@ local function checkGunUpgrades()
         gunshotSound = gunshotSounds.gunlevel6
         player.bulletSpeed = 70/1
         player.gunlevel = 6
+        player.autofire = true
+        player.laser = true
 
     elseif player.bulletDamage >= 60 then
         gunshotSound = gunshotSounds.gunlevel5
         player.bulletSpeed = 70/2
         player.gunlevel = 5
+        player.autofire = true
+        player.laser = true
 
     elseif player.bulletDamage >= 50 then
         gunshotSound = gunshotSounds.gunlevel4
         player.bulletSpeed = 70/3
         player.gunlevel = 4
+        player.autofire = true
+        player.laser = true
 
     elseif player.bulletDamage >= 40 then
         gunshotSound = gunshotSounds.gunlevel3
         player.bulletSpeed = 70/4
         player.gunlevel = 3
+        player.autofire = true
+        player.laser = true
 
     elseif player.bulletDamage >= 20 then
         gunshotSound = gunshotSounds.gunlevel2
         player.bulletSpeed = 70/5
         player.gunlevel = 2
+        player.autofire = true
+        player.laser = true
 
     elseif player.bulletDamage >= 15 then
         gunshotSound = gunshotSounds.gunlevel1
         player.bulletSpeed = 70/6
         player.gunlevel = 1
+        player.autofire = true
 
     else
         gunshotSound = gunshotSounds.gunlevel1
 
     end
+    
+
+    updateGunDisplay()
 
 end
 
@@ -395,9 +538,9 @@ local bosslLevels = {
         bossPicture2 = "assets/images/piranha2.png",
         isSpawned = false,
         isDead = false,
-        hp = 200,
+        hp = 2003,
         damage = 10,
-        exp = 200,
+        exp = 500,
         speedMultiplier = 1.5,
     },
     [8] = {
@@ -407,9 +550,9 @@ local bosslLevels = {
         bossPicture2 = "assets/images/seahorse2.png",
         isSpawned = false,
         isDead = false,
-        hp = 2000,
+        hp = 5000,
         damage = 20,
-        exp = 700,
+        exp = 1700,
         speedMultiplier = 2
     },
     [12] = {
@@ -419,9 +562,9 @@ local bosslLevels = {
         bossPicture2 = "assets/images/swordfish2.png",
         isSpawned = false,
         isDead = false,
-        hp = 3500,
+        hp = 13500,
         damage = 50,
-        exp = 2000,
+        exp = 9000,
         speedMultiplier = 2
     },
     [15] = {
@@ -431,9 +574,9 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 15000,
+        hp = 25000,
         damage = 70,
-        exp = 10500,
+        exp = 19500,
         speedMultiplier = 2
     },
     [17] = {
@@ -443,7 +586,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 300,
+        hp = 33300,
         damage = 50,
         exp = 100000,
         speedMultiplier = 2
@@ -455,7 +598,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 350,
+        hp = 67770,
         damage = 50,
         exp = 100000000,
         speedMultiplier = 2
@@ -467,7 +610,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 400,
+        hp = 400888,
         damage = 50,
         exp = 1000000000,
         speedMultiplier = 2
@@ -479,7 +622,7 @@ local bosslLevels = {
         bossPicture2 = "assets/images/hammerhead2.png",
         isSpawned = false,
         isDead = false,
-        hp = 450,
+        hp = 9999999,
         damage = 50,
         exp = 100000000000,
         speedMultiplier = 2
@@ -912,11 +1055,17 @@ local function checkHpPackCollision()
     end
 end
 
--- Pelaajan ampuminen
-local function fireBullet(event)
+
+
+-- AUTOFIRE MEKANIIKKA
+
+local isShooting = false
+local autoFireTimer = nil
+local bulletCreationOnGoing = false
+
+local function createBullet()
     if isPaused then return end
-    
-    if event.phase == "began" then
+        bulletCreationOnGoing = true
         local shooter = {player.model}
         audio.stop(channels.gunshot)
         audio.play(gunshotSound, { channel = channels.gunshot, loops = 0, fadein = 0, fadeout = 0 });
@@ -949,39 +1098,44 @@ local function fireBullet(event)
         table.insert(bullets, bullet)
 
         end
+    bulletCreationOnGoing = false
+end
+
+local function startAutoFire()
+    createBullet()
+    if not isShooting then
+        isShooting = true
+        autoFireTimer = timer.performWithDelay(150 / player.gunlevel * 2, createBullet, 0) -- Ammu 200 ms välein
     end
 end
 
--- AUTOFIRE MEKANIIKKA
+local function stopAutoFire()
+    if isShooting then
+        isShooting = false
+        if autoFireTimer then
+            timer.cancel(autoFireTimer)
+            autoFireTimer = nil
+        end
+    end
+end
 
--- local isShooting = false
--- local autoFireTimer = nil
+-- Pelaajan ampuminen
+local function fireBullet(event)
+    
+    if player.autofire then
+        if event.phase == "began" then
+            startAutoFire(event)
+        elseif event.phase == "ended" or event.phase == "cancelled" then
+            stopAutoFire()
+        end
+        return
+    end
 
--- local function startAutoFire()
---     fireBullet()
---     if not isShooting then
---         isShooting = true
---         autoFireTimer = timer.performWithDelay(300 / player.gunlevel * 2, fireBullet, 0) -- Ammu 200 ms välein
---     end
--- end
+    if event.phase == "began" then
+        createBullet(event)
+    end
 
--- local function stopAutoFire()
---     if isShooting then
---         isShooting = false
---         if autoFireTimer then
---             timer.cancel(autoFireTimer)
---             autoFireTimer = nil
---         end
---     end
--- end
-
--- local function onTouch(event)
---     if event.phase == "began" then
---         startAutoFire()
---     elseif event.phase == "ended" or event.phase == "cancelled" then
---         stopAutoFire()
---     end
--- end
+end
 
 -- Pelaajan liikkuminen WASD:llä
 local keysPressed = { w = false, a = false, s = false, d = false }
@@ -1109,10 +1263,10 @@ local function onKeyEvent(event)
         return true
 end
 
+
 local function updatePlayerMovement()
     if keysPressed.w then
         player.model.y = math.max(player.model.y - player.moveSpeed, 0)
-       
     end
     if keysPressed.s then
         player.model.y = math.min(player.model.y + player.moveSpeed, screenH)
@@ -1126,6 +1280,25 @@ local function updatePlayerMovement()
 
     camera.y = (player.yStart - player.model.y)
     camera.x = (player.xStart - player.model.x)
+
+    -- Päivitä laser
+    if laser then
+        -- Laske hiiren osoittimen ja pelaajan välinen ero
+        local mouseX, mouseY = laser._endX, laser._endY -- Laserin loppukoordinaatit
+        if mouseX and mouseY then
+            laser = display.newLine(centerX, centerY, mouseX, mouseY)
+            laser:setStrokeColor(1, 0, 0, 0.6) -- Punainen laser
+            laser.strokeWidth = 3
+                        -- Laserin fade-animaatio ja poisto
+            transition.to(laser, {
+                alpha = 0,
+                time = 50,
+                onComplete = function()
+                    display.remove(laser)
+                end
+            })
+        end
+    end
 end
 
 
@@ -1215,6 +1388,8 @@ local function showLevelUpScreen()
                 if b ~= button then display.remove(b) end
             end
             audio.play(FXfiles.perkChosen,{ channel = channels.explosion })
+            
+            checkGunUpgrades()
             resumeGame()  -- Resume the game
         end)
         table.insert(buttons, button)
@@ -1297,7 +1472,6 @@ local function moveAndCheckBullets(bulletTable)
                             updateLevelText()
                             showLevelUpScreen()
                             playerLevelUpMusic(player.level)
-                            checkGunUpgrades()
                             increaselevelUpExpThreshold()
                         end
 
