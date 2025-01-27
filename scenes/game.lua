@@ -546,6 +546,7 @@ function spawnBoss()
     boss.exp = bosslLevels[currentLevel].exp
     boss.isDead = false
     boss.isBoss = true
+    boss.knockbackLeft = {x = 0, y = 0}
 
     print("bossPicture1: " .. bosslLevels[currentLevel].bossPicture1)
     bosslLevels[currentLevel].isSpawned = true
@@ -673,7 +674,8 @@ local function spawnEnemy()
         exp = exp, --math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
         isBoss = false,
         variant = variantIndex, -- Tallenna viittaus varianttiin
-        animationFrame = 1 -- Alkuanimaatiokehys
+        animationFrame = 1, -- Alkuanimaatiokehys
+        knockbackLeft = { x = 0, y = 0 } -- Knockback-vektoria jäljellä
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
@@ -726,25 +728,40 @@ end
 -- Vihollisten liikuttaminen ja animointi
 local function moveEnemies()
     if isPaused then return end
-
     local playerX, playerY = player.model.x, player.model.y
     for i = #enemies, 1, -1 do
         local enemy = enemies[i]
-        local dx = playerX - enemy.model.x
-        local dy = playerY - enemy.model.y
+        local dx = playerX - enemy.model.x -- siirtymä x vektorilla
+        local dy = playerY - enemy.model.y -- siirtymä y vektorilla
         local distanceSquared = dx^2 + dy^2
         local collisionDistanceSquared = (60 + 15)^2 -- Törmäysetäisyys
-
+        local isKnockedBack = false
+    
         local speed = 2
         if enemy.isBoss then
             speed = (speed * currentLevel) / 3
         end
-
-        -- Päivitä vihollisen sijainti
-        if distanceSquared > 0 then
-            local distance = math.sqrt(distanceSquared)
-            enemy.model.x = enemy.model.x + (dx / distance) * speed
-            enemy.model.y = enemy.model.y + (dy / distance) * speed
+    
+        if enemy.knockbackLeft and (enemy.knockbackLeft.x ~= 0 or enemy.knockbackLeft.y ~= 0) then
+            local knockbackMagnitude = 10 -- Knockback-etäisyys
+            local knockbackDx = enemy.knockbackLeft.x
+            local knockbackDy = enemy.knockbackLeft.y
+            local knockbackDistance = math.sqrt(knockbackDx^2 + knockbackDy^2)
+    
+            if knockbackDistance > 0 then
+                enemy.model.x = enemy.model.x - (knockbackDx / knockbackDistance) * knockbackMagnitude
+                enemy.model.y = enemy.model.y - (knockbackDy / knockbackDistance) * knockbackMagnitude
+                isKnockedBack = true
+            end
+            enemy.knockbackLeft.x = 0
+            enemy.knockbackLeft.y = 0
+        else
+            -- Vihollinen seuraa pelaajaa, jos knockback ei ole aktiivinen
+            if distanceSquared > 0 then
+                local distance = math.sqrt(distanceSquared)
+                enemy.model.x = enemy.model.x + (dx / distance) * speed
+                enemy.model.y = enemy.model.y + (dy / distance) * speed
+            end
         end
 
         -- Törmäystarkistus pelaajan kanssa
@@ -768,7 +785,6 @@ end
 local function updateEnemyAnimations()
     if isPaused then return end
     for _, enemy in ipairs(enemies) do
-        -- Päivitetään animaatio tässä
         if enemy.isBoss then return end
 
         local variant = enemyVariants[enemy.variant]
@@ -798,13 +814,11 @@ end
 local hpPacks = {}
 
 local function spawnHpPack(x, y)
-    -- Luo HP-paketti, jossa on kaksi kuvaa päällekkäin
+    -- kaksi kuvaa päällekkäin
     local hpPack1 = display.newImageRect(camera, "/assets/images/healthpack.png", 50, 50)
-    hpPack1.x = x  -- Aseta x-koordinaatti
-    hpPack1.y = y  -- Aseta y-koordinaatti
-
-    -- Tummentaa kuvaa säilyttäen alkuperäiset yksityiskohdat
-    hpPack1:setFillColor(0.7, 0.7, 0.7)  -- Vähentää väriarvojen kirkkautta (50% alkuperäisestä)
+    hpPack1.x = x
+    hpPack1.y = y
+    hpPack1:setFillColor(0.7, 0.7, 0.7)  -- Vähentää väriarvojen kirkkautta (70% alkuperäisestä)
 
     -- Toinen kuva, joka tulee fadeamaan
     local hpPack2 = display.newImageRect(camera, "/assets/images/healthpack2.png", 50, 50)
@@ -840,10 +854,6 @@ local function spawnHpPack(x, y)
 
     -- Käynnistä animaatio
     fadeHpPack()
-
-    -- Suorita animaatio 500 ms välein toistuvasti
-    -- local newTimer = timer.performWithDelay(500, animateHpPack, 0)                  
-    -- table.insert(activeTimers, newTimer)
 end
 
 -- Luodit
@@ -1243,6 +1253,8 @@ local function moveAndCheckBullets(bulletTable)
 
                 if distanceSquared < collisionDistance then
                     -- Osuma havaittu
+                    enemies[j].knockbackLeft = { x = -bullet.vx * 50, y = -bullet.vy * 50 }
+                    
                     enemy.hp = enemy.hp - bullet.damage
 
                     if enemy.isBoss then
