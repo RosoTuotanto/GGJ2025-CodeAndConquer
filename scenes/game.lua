@@ -1,14 +1,15 @@
 local composer = require("composer")
 local scene = composer.newScene()
 local camera = display.newGroup()
-local friendList = {}
 
--- Luo pelikentän taustakuva
+-- Luo pelikentän taustakuva 
 local object = display.newImageRect("assets/images/waterground.png", 5500, 5500)
+local mask = graphics.newMask("assets/images/mask.png")  -- Pelikenttä kuvan maski
+object:setMask(mask)  -- Aseta maski tummennuskuvaan
+
 object.x = display.contentCenterX
 object.y = display.contentCenterY
 
--- Pelin päämuuttujat
 local centerX = display.contentCenterX
 local centerY = display.contentCenterY
 local screenW = display.contentWidth
@@ -19,8 +20,10 @@ camera:insert(object)
 
 native.setProperty( "mouseCursor", "crosshair" )
 native.setProperty( "mouseCursorVisible", false)
+
 local crosshair = display.newImageRect("assets/images/crosshair.png", 64, 64)
 crosshair.isVisible = false
+
 local function onMouseMove(event)
     crosshair.x = event.x
     crosshair.y = event.y
@@ -28,6 +31,12 @@ local function onMouseMove(event)
 end
 
 Runtime:addEventListener("mouse", onMouseMove)
+
+
+-- Pelin päämuuttujat
+local friendList = {}
+local activeTimers = {}
+local isPaused = false
 
 --------------------------------------------------
 -- AUDIO & MUSIC ------
@@ -202,27 +211,27 @@ background.x = 960
 background.y = 100
 
 local moveSpeedText= display.newText({
-    text = "MS:" .. player.moveSpeed,
+    text = "Speed:" .. player.moveSpeed,
     x = 960,
     y = 100,
     font =  native.systemFont,
     fontSize = 56,
 })
 local function updateMoveSpeedText()
-    moveSpeedText.text = "MS:" .. player.moveSpeed
+    moveSpeedText.text = "Speed:" .. player.moveSpeed
 end
 
 moveSpeedText:setFillColor(0, 0, 0)
 
 local bulletDamageText= display.newText({
-    text = "DMG:" .. player.bulletDamage,
+    text = "Damage:" .. player.bulletDamage,
     x = 480,
     y = 100,
     font =  native.systemFont,
     fontSize = 56,
 })
 local function updateBulletDamageText()
-    bulletDamageText.text = "DMG:" .. player.bulletDamage
+    bulletDamageText.text = "Damage:" .. player.bulletDamage
 end
 
 bulletDamageText:setFillColor(0, 0, 0)
@@ -320,9 +329,6 @@ local function animatePlayer()
     player.model.fill = { type = "image", filename = playerImages[player.currentFrame] }
 end
 
--- Ajastettu animaatio (toistuva tapahtuma)
-timer.performWithDelay(animationInterval, animatePlayer, 0) -- Toista loputtomasti
-
 
 
 -- Kokemuspisteiden raja seuraavaa tasoa varten
@@ -335,32 +341,32 @@ end
 local function checkGunUpgrades()
     
     if  player.bulletDamage >= 70 then    
-        gunshotSound = gunshotSounds.gunlevel7
+        gunshotSound = gunshotSounds.gunlevel6
         player.bulletSpeed = 70/1
         player.gunlevel = 6
 
     elseif player.bulletDamage >= 60 then
-        gunshotSound = gunshotSounds.gunlevel6
+        gunshotSound = gunshotSounds.gunlevel5
         player.bulletSpeed = 70/2
         player.gunlevel = 5
 
     elseif player.bulletDamage >= 50 then
-        gunshotSound = gunshotSounds.gunlevel5
+        gunshotSound = gunshotSounds.gunlevel4
         player.bulletSpeed = 70/3
         player.gunlevel = 4
 
     elseif player.bulletDamage >= 40 then
-        gunshotSound = gunshotSounds.gunlevel4
+        gunshotSound = gunshotSounds.gunlevel3
         player.bulletSpeed = 70/4
         player.gunlevel = 3
 
     elseif player.bulletDamage >= 20 then
-        gunshotSound = gunshotSounds.gunlevel3
+        gunshotSound = gunshotSounds.gunlevel2
         player.bulletSpeed = 70/5
         player.gunlevel = 2
 
     elseif player.bulletDamage >= 15 then
-        gunshotSound = gunshotSounds.gunlevel2
+        gunshotSound = gunshotSounds.gunlevel1
         player.bulletSpeed = 70/6
         player.gunlevel = 1
 
@@ -481,6 +487,14 @@ local bosslLevels = {
 
 }
 
+-- Vihollisten varianttitiedot
+local enemyVariants = {
+    { "assets/images/slime1.png", "assets/images/slime2.png" },
+    { "assets/images/slime3.png", "assets/images/slime4.png" },
+    { "assets/images/slime5.png", "assets/images/slime6.png" }
+}
+
+
 local function enemyDown()
     enemiesDown = enemiesDown + 1
 
@@ -494,7 +508,10 @@ local function enemyDown()
         end
 
         currentLevel = currentLevel + 1
-        enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
+        -- seuraava laskenta käytännössä aina 10%  lisää edellisen tason verran
+        enemiesPerLevel = (currentLevel * enemiesPerLevel) * 1.1
+        
+        -- enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
         print("Taso", currentLevel, "aloittaa")
         print("vihuja nitistettävä", enemiesPerLevel, "!")
         print("enemiesDown", enemiesDown)
@@ -623,107 +640,206 @@ local function calculateEnemyStats()
         damage = baseDamage + damageIncreasePerLevel * (player.level - 1)
     }
 end
+-- Vihollisten varianttitiedot (parit)
+local enemyVariants = {
+    { base = "assets/images/slime1.png", animation = "assets/images/slime2.png" },
+    { base = "assets/images/slime3.png", animation = "assets/images/slime4.png" },
+    { base = "assets/images/slime5.png", animation = "assets/images/slime6.png" }
+}
 
+-- Vihollisen luonti
 local function spawnEnemy()
     local stats = calculateEnemyStats()
 
-    -- Luo vihollinen kuvatiedostolla
+    -- Valitse satunnainen variantti
+    local variantIndex = math.random(1, #enemyVariants)
+
+    -- vihollisen koko on suoraanverrannollinen exp saantiin
+    local exp = math.random(5, 10) + (math.pow(player.level - 1,math.random(1, 3))) * 1.15
+    local enemysize = (exp%100)+10
+
+    if exp < 50 then
+        enemysize = 50
+    end
+
     local enemy = {
-        model = display.newImageRect(camera, "assets/images/slime1.png", 50, 50), -- Käytä ensimmäistä kuvaa
+        model = display.newImageRect(camera, enemyVariants[variantIndex].base, enemysize, enemysize), -- Käytä variantin ensimmäistä kuvaa
         hp = stats.hp,
         damage = stats.damage,
-        exp = math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
+        exp = exp, --math.random(5, 10) + (player.level - 1) * 1.15, -- EXP kasvaa tason mukana
         isBoss = false,
-        variant = 2 * math.random(3) - 1
+        variant = variantIndex, -- Tallenna viittaus varianttiin
+        animationFrame = 1 -- Alkuanimaatiokehys
     }
 
     -- Aseta vihollisen sijainti (satunnainen reuna)
     local spawnPosition = math.random(4)
     if spawnPosition == 1 then
-        -- Yläreuna
         enemy.model.x = math.random(20, screenW - 20)
         enemy.model.y = -20
     elseif spawnPosition == 2 then
-        -- Alareuna
         enemy.model.x = math.random(20, screenW - 20)
         enemy.model.y = screenH + 20
     elseif spawnPosition == 3 then
-        -- Vasemmalta
         enemy.model.x = -20
         enemy.model.y = math.random(20, screenH - 20)
     elseif spawnPosition == 4 then
-        -- Oikealta
         enemy.model.x = screenW + 20
         enemy.model.y = math.random(20, screenH - 20)
     end
 
-    -- Lisää vihollinen listaan
-    table.insert(enemies, enemy)
-
-    -- Animaatio: Vaihda kahden kuvan välillä
-    local frame = 1
-    local function animateEnemy()
-        if enemy.model.removeSelf == nil then
-            -- Jos vihollinen on poistettu, lopeta animaatio
-            return
-        end
-        if frame == 1 then
-            enemy.model.fill = { type = "image", filename = "assets/images/slime" .. enemy.variant .. ".png" }
-            frame = 2
-        else
-            enemy.model.fill = { type = "image", filename = "assets/images/slime" .. (enemy.variant + 1).. ".png" }
-            frame = 1
-        end
+    -- Ylös-alas liike animaatio
+    local function rotateCycle(enemymodel)
+        if enemymodel == nil then return end
+        -- Liiku ylös
+        transition.to(enemymodel.model, {
+            rotation = enemymodel.model.rotation - 15,
+            time = 500,
+            transition = easing.continuousLoop,
+            onComplete = function()
+                -- Kun siirtyminen ylöspäin on valmis, aloita siirtyminen alas
+                transition.to(enemymodel.model, {
+                    rotation = enemymodel.model.rotation + 15,
+                    time = 500,
+                    transition = easing.continuousLoop
+                    , onComplete = function()
+                        rotateCycle(enemymodel)
+                    end
+                })
+            end
+        })
     end
 
-    -- Käynnistä animaatio 500 ms välein
-    timer.performWithDelay(500, animateEnemy, 0)
+    -- Käynnistä ylös-alas liike
+    rotateCycle(enemy)
+
+    -- Lisää vihollinen listaan
+    table.insert(enemies, enemy)
 end
 
--- Vihollisten spawn-loopin käynnistäminen
+
+
+-- Vihollisten liikuttaminen ja animointi
+local function moveEnemies()
+    if isPaused then return end
+
+    local playerX, playerY = player.model.x, player.model.y
+    for i = #enemies, 1, -1 do
+        local enemy = enemies[i]
+        local dx = playerX - enemy.model.x
+        local dy = playerY - enemy.model.y
+        local distanceSquared = dx^2 + dy^2
+        local collisionDistanceSquared = (60 + 15)^2 -- Törmäysetäisyys
+
+        local speed = 2
+        if enemy.isBoss then
+            speed = (speed * currentLevel) / 3
+        end
+
+        -- Päivitä vihollisen sijainti
+        if distanceSquared > 0 then
+            local distance = math.sqrt(distanceSquared)
+            enemy.model.x = enemy.model.x + (dx / distance) * speed
+            enemy.model.y = enemy.model.y + (dy / distance) * speed
+        end
+
+        -- Törmäystarkistus pelaajan kanssa
+        if distanceSquared < collisionDistanceSquared then
+            player.hp = player.hp - enemy.damage
+            print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
+            updateHPDisplay()
+
+            if enemy.isBoss then
+                bosslLevels[currentLevel].isDead = true
+            end
+            audio.stop(channels.explosion)
+            audio.play(FXfiles.playerHit, { channel = channels.explosion })
+            display.remove(enemy.model)
+            table.remove(enemies, i)
+        end
+    end
+end
+
+-- Animaation päivitys ajastimella
+local function updateEnemyAnimations()
+    if isPaused then return end
+    for _, enemy in ipairs(enemies) do
+        -- Päivitetään animaatio tässä
+        if enemy.isBoss then return end
+
+        local variant = enemyVariants[enemy.variant]
+        if enemy.animationFrame == 1 then
+            enemy.model.fill = { type = "image", filename = variant.animation }
+            enemy.animationFrame = 2
+        else
+            enemy.model.fill = { type = "image", filename = variant.base }
+            enemy.animationFrame = 1
+        end
+    end
+end
+
+
+-- Vihollisten spawn-loop
 local function spawnEnemies()
     for i = 1, maxEnemiesPerSpawn do
         spawnEnemy()
     end
-
+    
     -- Lisää spawn-aikataulu uudelleen
     timer.performWithDelay(spawnDelay, spawnEnemies)
+
 end
-
--- Aloita vihollisten spawnaaminen
-timer.performWithDelay(spawnDelay, spawnEnemies)
-
-
 
 -- HP-paketit
 local hpPacks = {}
+
 local function spawnHpPack(x, y)
-    -- Luo HP-paketti käyttäen ensimmäistä kuvaa
-    local hpPack = display.newImageRect(camera, "/assets/images/healthpack.png", 50, 50)
-    hpPack.x = x  -- Aseta x-koordinaatti
-    hpPack.y = y  -- Aseta y-koordinaatti
+    -- Luo HP-paketti, jossa on kaksi kuvaa päällekkäin
+    local hpPack1 = display.newImageRect(camera, "/assets/images/healthpack.png", 50, 50)
+    hpPack1.x = x  -- Aseta x-koordinaatti
+    hpPack1.y = y  -- Aseta y-koordinaatti
 
-    -- Lisää HP-paketti listaan
-    table.insert(hpPacks, hpPack)
+    -- Tummentaa kuvaa säilyttäen alkuperäiset yksityiskohdat
+    hpPack1:setFillColor(0.7, 0.7, 0.7)  -- Vähentää väriarvojen kirkkautta (50% alkuperäisestä)
 
-    -- Animaatio: Vaihda kahden kuvan välillä
-    local frame = 1
-    local function animateHpPack()
-        if hpPack.removeSelf == nil then
+    -- Toinen kuva, joka tulee fadeamaan
+    local hpPack2 = display.newImageRect(camera, "/assets/images/healthpack2.png", 50, 50)
+    hpPack2.x = x
+    hpPack2.y = y
+    hpPack2.alpha = 0  -- Aluksi piilotetaan tämä kuva (alpha 0)
+
+    
+    -- Lisää HP-paketit listaan
+    table.insert(hpPacks, {hpPack1, hpPack2})
+
+    -- Animaatio: Fade HP-pack2 kuvaa
+    local function fadeHpPack()
+        if hpPack2.removeSelf == nil then
             -- Jos HP-paketti on jo poistettu, lopeta animaatio
             return
         end
-        if frame == 1 then
-            hpPack.fill = { type = "image", filename = "/assets/images/healthpack2.png" }
-            frame = 2
-        else
-            hpPack.fill = { type = "image", filename = "/assets/images/healthpack.png" }
-            frame = 1
-        end
+
+        -- Fade-in animaatio (hpPack2)
+        transition.to(hpPack2, {
+            alpha = 1,  -- Tekee hpPack2 näkyväksi
+            time = 500,  -- Fade-in kesto
+            onComplete = function()
+                -- Fade-out animaatio heti fade-in jälkeen
+                transition.to(hpPack2, {
+                    alpha = 0.4,  -- Tekee hpPack2 piiloon
+                    time = 500,  -- Fade-out kesto
+                    onComplete = fadeHpPack  -- Käynnistä animaatio uudelleen
+                })
+            end
+        })
     end
 
+    -- Käynnistä animaatio
+    fadeHpPack()
+
     -- Suorita animaatio 500 ms välein toistuvasti
-    timer.performWithDelay(500, animateHpPack, 0)
+    -- local newTimer = timer.performWithDelay(500, animateHpPack, 0)                  
+    -- table.insert(activeTimers, newTimer)
 end
 
 -- Luodit
@@ -740,7 +856,8 @@ end
 
 local function checkHpPackCollision()
     for i = #hpPacks, 1, -1 do
-        local hpPack = hpPacks[i]
+        local hpPack = hpPacks[i][1]
+        local hpPack2 = hpPacks[i][2]
         local dx = player.model.x - hpPack.x
         local dy = player.model.y - hpPack.y
         local distance = math.sqrt(dx^2 + dy^2)
@@ -750,7 +867,31 @@ local function checkHpPackCollision()
             print("Pelaajan HP:", player.hp)
             audio.stop( channels.pickup )
             audio.play( FXfiles.healthPickup, { channel = channels.pickup, loops = 0, fadein = 0, fadeout = 0 } )
+                     
             display.remove(hpPack)
+
+            -- Skew-efekti ja venytys HP-kuvalle 2
+            transition.to(hpPack2, {
+                xScale = 1.5,    -- Venyttää hieman x-suunnassa
+                yScale = 1.5,   -- Litistää y-suunnassa olemattomiin
+                alpha = 1,
+                time = 100,
+                transition = easing.inOutQuad,
+                onComplete = function()
+                    transition.to(hpPack2, {
+                        xScale = 1.5,    -- Venyttää hieman x-suunnassa
+                        yScale = 0.01,   -- Litistää y-suunnassa olemattomiin
+                        alpha = 0,
+                        time = 300,
+                        transition = easing.inOutQuad,
+                        onComplete = function()
+                            -- Poista molemmat kuvat ja päivitä lista
+                            display.remove(hpPack2)
+                        end
+                    })
+                end
+            })
+            
             table.remove(hpPacks, i)
             updateHPDisplay()
         end
@@ -759,6 +900,7 @@ end
 
 -- Pelaajan ampuminen
 local function fireBullet(event)
+    if isPaused then return end
     
     if event.phase == "began" then
         local shooter = {player.model}
@@ -844,6 +986,90 @@ local function activateSpeedBoost()
     end)
 end
 
+-- Pelin tauottaminen ja jatkaminen
+local function pauseGame()
+    for _, t in ipairs(activeTimers) do
+        if t and timer.resume(t) ~= nil then
+            timer.pause(t)
+        end
+    end
+    isPaused = true
+    gamePausedMusic()
+    -- timer.pauseAll()
+end
+
+local function resumeGame()
+    for _, t in ipairs(activeTimers) do
+        timer.resume(t)
+    end
+    isPaused = false
+    resumeMusic()
+    -- timer.resumeAll()
+end
+
+
+-- Variables to hold pause overlay elements
+local overlay, bubble, title
+
+
+local removeEventListeners = function()
+    Runtime:removeEventListener("touch", fireBullet)
+end
+
+local addEventListeners = function()
+    Runtime:addEventListener("touch", fireBullet)
+end
+
+-- Function to toggle pause
+local function togglePause()
+    
+    if not isPaused then
+        -- Pausing the game
+        pauseGame()
+        
+        -- Check if overlay and other elements exist; create only if they don't
+        if not overlay then
+            overlay = display.newRect(centerX, centerY, screenW, screenH)
+            overlay:setFillColor(0, 0, 0, 0.8)
+        end
+        
+        if not bubble then
+            bubble = display.newImageRect("assets/images/uibubble5.png", 400, 400)
+            bubble.x = centerX
+            bubble.y = centerY
+            bubble:toFront()
+        end
+        
+        if not title then
+            title = display.newText("Pause.", centerX, centerY, native.systemFontBold, 32)
+            title:setFillColor(0, 0, 0)
+        end
+
+        removeEventListeners()
+    else
+        -- Unpausing the game
+        if overlay then
+            display.remove(overlay)
+            overlay = nil
+        end
+        
+        if bubble then
+            display.remove(bubble)
+            bubble = nil
+        end
+        
+        if title then
+            display.remove(title)
+            title = nil
+        end
+                
+        addEventListeners()
+        audio.play(FXfiles.perkChosen, { channel = channels.explosion })
+        resumeGame()
+    end
+end
+
+
 local function onKeyEvent(event)
     local key = event.keyName
     if keysPressed[key] ~= nil then
@@ -854,11 +1080,18 @@ local function onKeyEvent(event)
         end
     end
 
+    -- pelin pysäyttäminen hetkellisesti
+    if key == "p" and event.phase == "down"  or  event.keyName == "escape"  and event.phase == "down" then --esc
+        togglePause()
+        return true
+    else
+
         -- Tarkista spacebar boostille
         if key == "space" and event.phase == "down" and not player.isBoosting then
             activateSpeedBoost()
         end
-    
+
+    end
         return true
 end
 
@@ -881,19 +1114,6 @@ local function updatePlayerMovement()
     camera.x = (player.xStart - player.model.x)
 end
 
--- Pelin tauottaminen ja jatkaminen
-local isPaused = false
-local function pauseGame()
-    isPaused = true
-    gamePausedMusic()
-    timer.pauseAll()
-end
-
-local function resumeGame()
-    isPaused = false
-    resumeMusic()
-    timer.resumeAll()
-end
 
 -- Funktio, joka luo uuden ystävän
 local function createFriend()
@@ -963,18 +1183,26 @@ local function showLevelUpScreen()
 
         -- Button tap action
         button:addEventListener("tap", function()
+            transition.to(button, { 
+                time = 500, 
+                xScale = 3,    -- Venyttää hieman x-suunnassa
+                yScale = 3,   -- Litistää y-suunnassa olemattomiin
+                alpha = 0, onComplete = function()
+                    display.remove(button) 
+                end 
+            })
+
             option.action()  -- Execute the selected option's action
             -- Remove level-up screen after selecting an option
             display.remove(overlay)
             display.remove(title)
             display.remove(bubble)
             for _, b in ipairs(buttons) do
-                display.remove(b)
+                if b ~= button then display.remove(b) end
             end
             audio.play(FXfiles.perkChosen,{ channel = channels.explosion })
             resumeGame()  -- Resume the game
         end)
-
         table.insert(buttons, button)
     end
 
@@ -983,172 +1211,96 @@ local function showLevelUpScreen()
     maxEnemiesPerSpawn = math.min(5, maxEnemiesPerSpawn + 1)  -- Increase the number of enemies spawned, but no more than 5
 end
 
-
--- Vihollisten liikuttaminen ja törmäys
-local function moveEnemies()
+local function moveAndCheckBullets(bulletTable)
     if isPaused then return end
-    for i = #enemies, 1, -1 do
-        local enemy = enemies[i]
-        local dx = player.model.x - enemy.model.x
-        local dy = player.model.y - enemy.model.y
-        local distance = math.sqrt(dx^2 + dy^2)
-        local speed = 2
 
-        if enemy.isBoss then
-            speed = (speed * currentLevel) / 3
-        end
+    local screenWidth = display.contentWidth
+    local screenHeight = display.contentHeight
+    local buffer = 2000 -- Jätetään pieni varmuusalue ruudun ulkopuolelle
 
-        if distance > 0 then
-            enemy.model.x = enemy.model.x + (dx / distance) * speed
-            enemy.model.y = enemy.model.y + (dy / distance) * speed
-        end
-
-        -- Pelaajaan osuminen
-        if distance < 60 + 15 then
-            player.hp = player.hp - enemy.damage
-            print("Pelaaja osui viholliseen! Pelaajan HP:", player.hp)
-            updateHPDisplay()
-
-            if enemy.isBoss then
-                bosslLevels[currentLevel].isDead = true
-            end
-            audio.stop( channels.explosion )
-            audio.play(FXfiles.playerHit,{ channel = channels.explosion })
-            display.remove(enemy.model)
-            table.remove(enemies, i)
-        end
-    end
-end
-
--- Luotien liikuttaminen
-local function moveBullets()
-    if isPaused then return end
-    for i = #bullets, 1, -1 do
-        local bullet = bullets[i]
+    for i = #bulletTable, 1, -1 do
+        local bullet = bulletTable[i]
         bullet.x = bullet.x + bullet.vx
         bullet.y = bullet.y + bullet.vy
 
-        for j = #enemies, 1, -1 do
-            local enemy = enemies[j]
-            local dx = bullet.x - enemy.model.x
-            local dy = bullet.y - enemy.model.y
-            local distance = math.sqrt(dx^2 + dy^2)
-            if distance < 40 + 5 then
-                enemy.hp = enemy.hp - bullet.damage
-                if enemy.isBoss then
-                    print("Bossiin osui! HP:", enemy.hp)
-                else
-                    --print("Viholliseen osui! HP:", enemy.hp)
-                end
+        -- Tarkista, onko luoti poistunut ruudulta
+        if bullet.x < -buffer or bullet.x > screenWidth + buffer or 
+           bullet.y < -buffer or bullet.y > screenHeight + buffer then
+            display.remove(bullet)
+            table.remove(bulletTable, i)
+        else
+            -- Tarkista törmäykset vihollisten kanssa
+            for j = #enemies, 1, -1 do
+                local enemy = enemies[j]
+                local dx = bullet.x - enemy.model.x
+                local dy = bullet.y - enemy.model.y
+                local distanceSquared = dx^2 + dy^2 -- Optimointi: Vältetään sqrt()
+                local collisionDistance = (40 + 5)^2 -- Suorakulmaisen alueen neliö
 
-                audio.stop( channels.explosion )
-                if enemy.hp <= 0 then 
-                    audio.play(FXfiles.enemyDie,{ channel = channels.explosion })
-                else
-                    audio.play(FXfiles.enemyDamage,{ channel = channels.explosion })
-                end
+                if distanceSquared < collisionDistance then
+                    -- Osuma havaittu
+                    enemy.hp = enemy.hp - bullet.damage
+
+                    if enemy.isBoss then
+                        print("Bossiin osui! HP:", enemy.hp)
+                    end
 
                     if enemy.hp <= 0 then
-                    if enemy.isBoss then
-                        bosslLevels[currentLevel].isDead = true
+                        audio.play(FXfiles.enemyDie,{ channel = channels.explosion })
+
+                        if enemy.isBoss then
+                            bosslLevels[currentLevel].isDead = true
+                        end
+
+                        enemyDown()        
+                                    
+                        -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 3015% mahdollisuus)
+                        if math.random() < 0.15 then
+                            spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
+                            print("HP-paketti tiputettu!")
+                        end
+
+                        print("vihollisen antama exp: ", enemy.exp)
+
+                        -- Vihollinen kuoli, käsittele EXP ja palkkiot
+                        player.exp = player.exp + enemy.exp
+
+                        print("pelaajan taso: ",player.level)
+                        print("pelin taso: ",currentLevel)
+
+                        print("seuraavaan pelaajan leveliin tarvittava exp: ", (levelUpExpThreshold - player.exp))
+                        
+                        print("seuraavaan pelin leveliin tarvittava killcount: ", (enemiesPerLevel - enemiesDown))
+
+
+
+                        if player.exp >= levelUpExpThreshold then
+                            player.level = player.level + 1
+                            audio.play(FXfiles.lvlUp, { channel = channels.explosion })
+                            print("Pelaajan taso nousi! Nykyinen taso:", player.level)
+                            updateLevelText()
+                            showLevelUpScreen()
+                            playerLevelUpMusic(player.level)
+                            checkGunUpgrades()
+                            increaselevelUpExpThreshold()
+                        end
+
+                        -- Lisää splatter-animaatio
+                        local splatter = display.newImageRect(camera, "assets/images/splatter.png", 80, 80)
+                        splatter.x = enemy.model.x
+                        splatter.y = enemy.model.y
+                        transition.to(splatter, { alpha = 0, time = 5000, onComplete = function() display.remove(splatter) end })
+
+                        display.remove(enemy.model)
+                        table.remove(enemies, j)
+                    else
+                        audio.play(FXfiles.enemyDamage,{ channel = channels.explosion })
                     end
 
-                    enemyDown(enemy)
-                    player.exp = player.exp + enemy.exp
-                    print("Vihollinen kuoli! EXP:", player.exp)
-
-                    -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
-                    if math.random() < 0.3 then
-                        spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
-                        print("HP-paketti tiputettu!")
-                    end
-
-                    if player.exp >= levelUpExpThreshold then
-                        -- player.exp = 0
-                        player.level = player.level + 1
-                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
-                        print("Taso nousi! Nykyinen taso:", player.level)
-                        updateLevelText()
-                        showLevelUpScreen()
-                        playerLevelUpMusic(player.level)
-                        checkGunUpgrades()
-                        increaselevelUpExpThreshold()
-                        print("Level up threshold increased to:", levelUpExpThreshold)
-                    end
-
-                    -- Lisää splatter kupla-hajoamispisteeseen
-                    local splatter = display.newImageRect(camera, "assets/images/splatter.png", 80, 80)
-                    splatter.x = enemy.model.x
-                    splatter.y = enemy.model.y
-
-                    -- Voit lisätä animaation tai hävittää kuvan myöhemmin
-                    transition.to(splatter, { alpha = 0, time = 5000, onComplete = function() display.remove(splatter) end })
-
-                    display.remove(enemy.model)
-                    table.remove(enemies, j)
+                    display.remove(bullet)
+                    table.remove(bulletTable, i)
+                    break
                 end
-
-                display.remove(bullet)
-                table.remove(bullets, i)
-                break
-            end
-        end
-    end
-end
-
-local function moveFriendBullets()
-    if isPaused then return end
-    for i = #friendBullets, 1, -1 do
-        local friendBullet = friendBullets[i]
-        friendBullet.x = friendBullet.x + friendBullet.vx
-        friendBullet.y = friendBullet.y + friendBullet.vy
-
-        for j = #enemies, 1, -1 do
-            local enemy = enemies[j]
-            local dx = friendBullet.x - enemy.model.x
-            local dy = friendBullet.y - enemy.model.y
-            local distance = math.sqrt(dx^2 + dy^2)
-            if distance < 40 + 5 then
-                enemy.hp = enemy.hp - friendBullet.damage
-                print("Viholliseen osui! HP:", enemy.hp)
-                if enemy.hp <= 0 then
-                    player.exp = player.exp + enemy.exp
-                    print("Vihollinen kuoli! EXP:", player.exp)
-
-                    -- Satunnainen todennäköisyys HP-paketin tiputukseen (esim. 30% mahdollisuus)
-                    if math.random() < 0.3 then
-                        spawnHpPack(enemy.model.x, enemy.model.y)  -- HP-paketti tiputetaan
-                        print("HP-paketti tiputettu!")
-                    end
-
-                    if player.exp >= levelUpExpThreshold then
-                        -- player.exp = 0
-                        player.level = player.level + 1
-                        audio.play(FXfiles.lvlUp,{ channel = channels.explosion })
-                        print("Taso nousi! Nykyinen taso:", player.level)
-                        updateLevelText()
-                        showLevelUpScreen()
-                        playerLevelUpMusic(player.level)
-                        checkGunUpgrades()
-                        increaselevelUpExpThreshold()
-                        print("Level up threshold increased to:", levelUpExpThreshold)
-                    end
-
-                    -- Lisää splatter kupla-hajoamispisteeseen
-                    local splatter = display.newImageRect(camera, "assets/images/splatter.png", 80, 80)
-                    splatter.x = enemy.model.x
-                    splatter.y = enemy.model.y
-
-                    -- Voit lisätä animaation tai hävittää kuvan myöhemmin
-                    transition.to(splatter, { alpha = 0, time = 5000, onComplete = function() display.remove(splatter) end })
-
-                    display.remove(enemy.model)
-                    table.remove(enemies, j)
-                end
-
-                display.remove(friendBullet)
-                table.remove(friendBullets, i)
-                break
             end
         end
     end
@@ -1176,7 +1328,12 @@ local function restartGame()
             bosslLevels[currentLevel].bossResource.timer = nil
         end
     end
-    
+        for _, t in ipairs(activeTimers) do
+        if t and timer.resume(t) ~= nil then
+            timer.pause(t)
+        end
+        activeTimers = {}
+    end
     Runtime:removeEventListener("enterFrame", gameLoop)
     Runtime:removeEventListener("key", onKeyEvent)
     Runtime:removeEventListener("touch", fireBullet)
@@ -1205,7 +1362,6 @@ local function showGameOverScreen()
     restartButton:addEventListener("tap", restartGame)
 end
 
-
 -- Tarkista pelaajan HP
 local function checkPlayerHealth()
     if player.hp <= 0 then
@@ -1213,7 +1369,10 @@ local function checkPlayerHealth()
     end
 end
 
-
+local function moveBullets()
+    moveAndCheckBullets(bullets) 
+    moveAndCheckBullets(friendBullets)
+end
 
 -- Pelin päivitys
 local function gameLoop()
@@ -1221,7 +1380,6 @@ local function gameLoop()
     updatePlayerMovement()
     moveEnemies()
     moveBullets()
-    moveFriendBullets()
     checkPlayerHealth()  -- Tarkistetaan pelaajan terveys
     checkHpPackCollision()  -- Tarkistetaan pelaajan osuminen HP-packeihin
 end
@@ -1234,6 +1392,16 @@ function scene:show(event)
         player.hp = 100
         player.level = 1
         player.exp = 0
+        currentLevel = 1
+        levelUpExpThreshold = 50
+
+        -- Ajastin animaation päivitykseen
+        local animationTimer = timer.performWithDelay(animationInterval, animatePlayer, 0)                    
+        table.insert(activeTimers, animationTimer)
+
+        -- Ajastettu animaatio (toistuva tapahtuma)
+        local enemyAnimationTimer = timer.performWithDelay(400, updateEnemyAnimations, 0)                  
+        table.insert(activeTimers, enemyAnimationTimer)
 
         timer.performWithDelay(spawnDelay, spawnEnemies)
         Runtime:addEventListener("key", onKeyEvent)
@@ -1242,7 +1410,6 @@ function scene:show(event)
         Runtime:addEventListener("enterFrame", gameLoop)
     end
 end
-
 
 function scene:hide(event)
     local sceneGroup = self.view
@@ -1253,6 +1420,20 @@ function scene:hide(event)
         Runtime:removeEventListener("enterFrame", gameLoop)
     end
 end
+
+-- Ajastettu vihollisten spawn
+-- local spawnTimer = timer.performWithDelay(spawnDelay, spawnEnemies, 0)                  
+-- table.insert(activeTimers, spawnTimer)
+
+-- Ajastin animaation päivitykseen
+-- local animationTimer = timer.performWithDelay(animationInterval, animatePlayer, 0)                    
+-- table.insert(activeTimers, animationTimer)
+
+-- -- Ajastettu animaatio (toistuva tapahtuma)
+-- local enemyAnimationTimer = timer.performWithDelay(400, updateEnemyAnimations, 0)                  
+-- table.insert(activeTimers, enemyAnimationTimer)
+
+
 
 scene:addEventListener("show", scene)
 scene:addEventListener("hide", scene)
