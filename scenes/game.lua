@@ -57,7 +57,7 @@ local function onMouseMove(event)
     crosshair.y = event.y
     crosshair.isVisible = true
 
-    if event.isPrimaryButtonDown and player.laser then
+    if event.isPrimaryButtonDown and player.laser and not isPaused then
         updateLaser(event)
     end
 end
@@ -78,11 +78,11 @@ audio.setVolume( 1 )
 local gunshotSounds = {
     gunlevel1 = audio.loadSound( "assets/audio/fx/guns/bubble_wand/bubble_wand_shoot.wav" ),
     gunlevel2 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
-    gunlevel3 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
-    gunlevel4 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
-    gunlevel5 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
-    gunlevel6 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" ),
-    gunlevel7 = audio.loadSound( "assets/audio/fx/guns/foam_sprayer/foam_sprayer_shoot.wav" )
+    gunlevel3 = audio.loadSound( "assets/audio/fx/guns/bubble_popper/bubble_popper_shoot.wav" ),
+    gunlevel4 = audio.loadSound( "assets/audio/fx/guns/bubble_popper/bubble_popper_shoot.wav" ),
+    gunlevel5 = audio.loadSound( "assets/audio/fx/guns/bubble_popper/bubble_popper_shoot.wav" ),
+    gunlevel6 = audio.loadSound( "assets/audio/fx/guns/bubble_popper/bubble_popper_shoot.wav" ),
+    gunlevel7 = audio.loadSound( "assets/audio/fx/guns/bubble_popper/bubble_popper_shoot.wav" )
 }
 
 local gunshotSound = audio.loadSound( gunshotSounds.gunlevel1 )
@@ -463,8 +463,41 @@ updateGunDisplay()
 -- Kokemuspisteiden raja seuraavaa tasoa varten
 local levelUpExpThreshold = 50 -- EXP tarvitaan level-upiin
 
+
+local levelConfigs = {
+    { level = 1, maxEnemies = 10 , minEnemies = 5   , experienceThreshold =  10  },
+    { level = 2, maxEnemies = 100, minEnemies = 20  , experienceThreshold =  100  },
+    { level = 3, maxEnemies = 300 , minEnemies = 50 , experienceThreshold =  100  },
+    { level = 4, maxEnemies = 400 , minEnemies = 50 , experienceThreshold =  500 },
+    { level = 5, maxEnemies = 500 , minEnemies = 100, experienceThreshold =  1000  },
+    { level = 6, maxEnemies = 600 , minEnemies = 100, experienceThreshold =  5000  },
+    { level = 7, maxEnemies = 700 , minEnemies = 100, experienceThreshold =  10000  },
+    { level = 8, maxEnemies = 800 , minEnemies = 100, experienceThreshold =  10000  },
+    { level = 9, maxEnemies = 900 , minEnemies = 100, experienceThreshold =  20000  },
+    { level = 10, maxEnemies = 999, minEnemies = 100, experienceThreshold =  30000  },
+    { level = 11, maxEnemies = 999, minEnemies = 100, experienceThreshold =  40000  },
+    { level = 12, maxEnemies = 999, minEnemies = 100, experienceThreshold =  50000  },
+    { level = 13, maxEnemies = 999, minEnemies = 100, experienceThreshold =  60000  },
+    { level = 14, maxEnemies = 999, minEnemies = 100, experienceThreshold =  70000  },
+    { level = 15, maxEnemies = 999, minEnemies = 100, experienceThreshold =  80000  },
+    { level = 16, maxEnemies = 999, minEnemies = 100, experienceThreshold =  90000  },
+    { level = 17, maxEnemies = 999, minEnemies = 100, experienceThreshold =  99000  },
+    { level = 18, maxEnemies = 999, minEnemies = 100, experienceThreshold =  99999  },
+    { level = 19, maxEnemies = 999, minEnemies = 100, experienceThreshold =  99999  },
+    { level = 20, maxEnemies = 999, minEnemies = 100, experienceThreshold =  99999  },
+    -- Lisää tasoja tarpeen mukaan
+}
+
 local function increaselevelUpExpThreshold() 
-    levelUpExpThreshold = (levelUpExpThreshold * player.level / 2) * 1.1
+ 
+    -- levelUpExpThreshold = (levelUpExpThreshold * ((player.level / 2) % 9)) * 1.1
+    for _, config in ipairs(levelConfigs) do
+        if config.level == player.level then
+            levelUpExpThreshold = levelUpExpThreshold + math.min( math.max(((levelUpExpThreshold * (player.level / 2)) * 1.1), config.experienceThreshold), config.experienceThreshold)
+        end
+    end
+    -- Palautetaan oletusarvo, jos tasoa ei löydy listasta
+    levelUpExpThreshold = levelUpExpThreshold + math.min( (levelUpExpThreshold * 1.1), 9999)
 end
 
 local function checkGunUpgrades()
@@ -529,6 +562,16 @@ currentLevel = 1 -- käytännössä määrää pelin kulun!
 local enemiesPerLevel = 1  * currentLevel * maxEnemiesPerSpawn -- Määrä vihollisia per taso (kasvaa tason mukaan)
 local totalEnemiesSpawned = 0
 local enemiesDown = 0
+
+local function getLevelMaxEnemies(level)
+    for _, config in ipairs(levelConfigs) do
+        if config.level == level then
+            return math.min(math.max(((currentLevel * enemiesPerLevel) * 1.1), config.minEnemies), config.maxEnemies)
+        end
+    end
+    -- Palautetaan oletusarvo, jos tasoa ei löydy listasta
+    return 100
+end
 
 local bosslLevels = { 
     [5] = {
@@ -637,22 +680,91 @@ local enemyVariants = {
     { "assets/images/slime5.png", "assets/images/slime6.png" }
 }
 
+-- 00:22:56.382  vihuja nitistettävä	100	!
+-- 00:22:56.382  enemiesDown	108
+-- 00:22:56.382  Spawnataan boss
+-- 00:22:56.382  bossPicture1: assets/images/hammerhead.png
+-- 00:22:56.382  vihollisen antama exp: 	12.9
+-- 00:22:56.382  pelaajan taso: 	7
+-- 00:22:56.382  pelin taso: 	30
+-- 00:22:56.382  seuraavaan pelaajan leveliin tarvittava exp: 	446.57143750001
+-- 00:22:56.382  seuraavaan pelin leveliin tarvittava killcount: 	-8
+-- 00:22:56.896  vihollisen antama exp: 	257.4
+-- 00:22:56.896  pelaajan taso: 	7
+-- 00:22:56.896  pelin taso: 	30
+-- 00:22:56.896  seuraavaan pelaajan leveliin tarvittava exp: 	189.17143750001
+-- 00:22:56.896  seuraavaan pelin leveliin tarvittava killcount: 	-8
+-- 00:22:56.926  Bossiin osui! HP:	67735
+-- 00:22:57.019  Bossiin osui! HP:	67717.5
+-- 00:22:57.066  Bossiin osui! HP:	67682.5
+-- 00:22:57.158  Bossiin osui! HP:	67647.5
+-- 00:22:57.173  Pelaaja osui viholliseen! Pelaajan HP:	28
+-- 00:22:57.282  removeBoss(): poistetaan boss
+-- 00:22:57.484  Taso	31	aloittaa
+-- 00:22:57.484  vihuja nitistettävä	100	!
+-- 00:22:57.484  enemiesDown	109
+-- 00:22:57.484  vihollisen antama exp: 	13.9
+-- 00:22:57.484  pelaajan taso: 	7
+-- 00:22:57.484  pelin taso: 	31
+-- 00:22:57.484  seuraavaan pelaajan leveliin tarvittava exp: 	175.27143750001
+-- 00:22:57.484  seuraavaan pelin leveliin tarvittava killcount: 	-9
+-- 00:22:57.561  Taso	32	aloittaa
+-- 00:22:57.561  vihuja nitistettävä	100	!
+-- 00:22:57.561  enemiesDown	110
+-- 00:22:57.561  vihollisen antama exp: 	13.9
+-- 00:22:57.561  pelaajan taso: 	7
+-- 00:22:57.561  pelin taso: 	32
+-- 00:22:57.561  seuraavaan pelaajan leveliin tarvittava exp: 	161.37143750001
+-- 00:22:57.561  seuraavaan pelin leveliin tarvittava killcount: 	-10
+-- 00:22:57.951  Taso	33	aloittaa
+-- 00:22:57.951  vihuja nitistettävä	100	!
+-- 00:22:57.951  enemiesDown	111
+-- 00:22:57.951  vihollisen antama exp: 	48.4
+-- 00:22:57.951  pelaajan taso: 	7
+-- 00:22:57.951  pelin taso: 	33
+-- 00:22:57.951  seuraavaan pelaajan leveliin tarvittava exp: 	112.97143750001
+-- 00:22:57.951  seuraavaan pelin leveliin tarvittava killcount: 	-11
+-- 00:22:58.106  Taso	34	aloittaa
+-- 00:22:58.106  vihuja nitistettävä	100	!
+-- 00:22:58.106  enemiesDown	112
+-- 00:22:58.106  vihollisen antama exp: 	11.9
+-- 00:22:58.106  pelaajan taso: 	7
+-- 00:22:58.106  pelin taso: 	34
+-- 00:22:58.106  seuraavaan pelaajan leveliin tarvittava exp: 	101.07143750001
+-- 00:22:58.106  seuraavaan pelin leveliin tarvittava killcount: 	-12
+-- 00:22:58.184  Pelaaja osui viholliseen! Pelaajan HP:	6
+-- 00:22:58.602  Taso	35	aloittaa
+-- 00:22:58.602  vihuja nitistettävä	100	!
+-- 00:22:58.602  enemiesDown	113
+-- 00:22:58.602  Spawnataan boss
+-- 00:22:58.602  bossPicture1: assets/images/hammerhead.png
+-- 00:22:58.602  HP-paketti tiputettu!
+-- 00:22:58.602  vihollisen antama exp: 	258.4
+-- 00:22:58.602  pelaajan taso: 	7
+-- 00:22:58.602  pelin taso: 	35
+-- 00:22:58.602  seuraavaan pelaajan leveliin tarvittava exp: 	-157.32856249999
+-- 00:22:58.602  seuraavaan pelin leveliin tarvittava killcount: 	-13
+-- 00:22:58.602  Pelaajan taso nousi! Nykyinen taso:	8
+-- 00:22:58.602  WARNING: timer.resume( timerId ) ignored because timerId was not paused.
+-- 00:22:58.602  WARNING: timer.resume( timerId ) ignored because timerId was not paused.
 
 local function enemyDown()
+
+    -- ei voida edistää peliä jos bossi on olemassa
+    if bosslLevels[currentLevel] ~= nil and
+        bosslLevels[currentLevel].isSpawned == true and
+        bosslLevels[currentLevel].isDead == false
+        then
+        return
+    end
+
     enemiesDown = enemiesDown + 1
 
     if enemiesDown >= enemiesPerLevel then
-        -- ei voida edistää peliä jos bossi on olemassa
-        if bosslLevels[currentLevel] ~= nil and
-         bosslLevels[currentLevel].isSpawned == true and
-         bosslLevels[currentLevel].isDead == false
-          then
-            return
-        end
 
         currentLevel = currentLevel + 1
         -- seuraava laskenta käytännössä aina 10%  lisää edellisen tason verran
-        enemiesPerLevel = (currentLevel * enemiesPerLevel) * 1.1
+        enemiesPerLevel = enemiesPerLevel +getLevelMaxEnemies(currentLevel)
         
         -- enemiesPerLevel = enemiesPerLevel  * currentLevel * maxEnemiesPerSpawn
         print("Taso", currentLevel, "aloittaa")
@@ -701,6 +813,11 @@ function spawnBoss()
     local frame = 1
     local function animateBoss()
         -- print("animateBoss(): animoidaan bossi")
+        if bosslLevels[currentLevel] == nil then
+            removeBoss(boss)
+            return
+        end
+
         local boss = bosslLevels[currentLevel].bossResource
         
         if boss.isDead or not boss.model then
@@ -764,10 +881,11 @@ function removeBoss(boss)
 
     if bosslLevels[currentLevel] then
         bosslLevels[currentLevel].isDead = true
-    end
 
-    if bosslLevels[currentLevel].bossResource.timer then
-        timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+
+        if bosslLevels[currentLevel].bossResource.timer then
+            timer.cancel(bosslLevels[currentLevel].bossResource.timer)
+        end    
     end
 
 end
