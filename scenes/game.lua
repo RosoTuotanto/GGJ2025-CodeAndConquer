@@ -656,10 +656,14 @@ local function spawnEnemy()
 
     -- vihollisen koko on suoraanverrannollinen exp saantiin
     local exp = math.random(5, 10) + (math.pow(player.level - 1,math.random(1, 3))) * 1.15
-    local enemysize = (exp%100)+10
+    local enemysize = (exp%100)+30
 
     if exp < 50 then
         enemysize = 50
+
+        if exp < 10 then
+            exp = 10
+        end
     end
 
     local enemy = {
